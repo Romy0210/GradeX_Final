@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to safely check for admin role
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Rules for user profiles
+    match /users/{userId} {
+      // Admins can manage any profile, and users can manage their own.
+      allow read, write: if isAdmin() || request.auth.uid == userId;
+    }
+
+    // Rules for student data
+    match /students/{studentId} {
+        // Admins have full read/write access to all student records.
+        allow read, write: if isAdmin();
+
+        // A student can read their own data.
+        // The rule requires the document to have an 'email' field that matches the user's authenticated email.
+        // This is secure and allows the client query `where('email', '==', user.email)` to work.
+        allow read: if 'email' in resource.data && resource.data.email == request.auth.token.email;
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "placeholderImages": [
+    {
+      "id": "login-hero",
+      "description": "Students collaborating in a modern library",
+      "imageUrl": "https://images.unsplash.com/photo-1595315343110-9b445a960442?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxzdHVkZW50cyUyMGxpYnJhcnl8ZW58MHx8fHwxNzY5MzE1MDUxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "students library"
+    },
+    {
+      "id": "student-1",
+      "description": "Profile of Alex Johnson",
+      "imageUrl": "https://images.unsplash.com/photo-1513258496099-48168024aec0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxtYWxlJTIwc3R1ZGVudHxlbnwwfHx8fDE3NjkyNTA4NjF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "male student"
+    },
+    {
+      "id": "student-2",
+      "description": "Profile of Maria Garcia",
+      "imageUrl": "https://images.unsplash.com/photo-1584473457409-ae5c91d7d8b1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxmZW1hbGUlMjBzdHVkZW50fGVufDB8fHx8MTc2OTMyMjg3OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "female student"
+    },
+    {
+      "id": "student-3",
+      "description": "Profile of James Wilson",
+      "imageUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxtYWxlJTIwcG9ydHJhaXR8ZW58MHx8fHwxNzE2NDg0OTU3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "male student"
+    },
+    {
+      "id": "student-4",
+      "description": "Profile of Sophia Chen",
+      "imageUrl": "https://images.unsplash.com/photo-1525134479668-1bee5c7c6845?q=80&w=1080&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      "imageHint": "female student"
+    },
+    {
+      "id": "student-5",
+      "description": "Profile of David Smith",
+      "imageUrl": "https://images.unsplash.com/photo-1631131426242-0abfa7f209c2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxtYWxlJTIwc3R1ZGVudHxlbnwwfHx8fDE3NjkyNTA4NjF8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "male student"
+    }
+  ]
+}
