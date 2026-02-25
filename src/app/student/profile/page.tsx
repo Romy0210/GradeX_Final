@@ -47,7 +47,7 @@ export default function StudentProfilePage() {
   const { user, userProfile, isLoading: isUserLoading } = useUser();
   const { students, updateStudent, findStudentById } = useStudentData();
   const [studentData, setStudentData] = useState<ReturnType<typeof findStudentById>>(undefined);
-  
+
   const app = useFirebaseApp();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -59,7 +59,7 @@ export default function StudentProfilePage() {
 
   useEffect(() => {
     if (user && students.length > 0) {
-      setStudentData(students.find(s => s.email === user.email));
+      setStudentData(students.find(s => s.id === user.uid));
     }
   }, [user, students]);
 
@@ -82,7 +82,7 @@ export default function StudentProfilePage() {
       confirmPassword: '',
     }
   });
-  
+
   const { formState: { isDirty } } = form;
 
   useEffect(() => {
@@ -96,7 +96,7 @@ export default function StudentProfilePage() {
       });
     }
   }, [studentData, form]);
-  
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -112,94 +112,94 @@ export default function StudentProfilePage() {
       setImagePreview(URL.createObjectURL(file));
     }
   };
-  
+
   const resetImageSelection = () => {
-      setImageFile(null);
-      setImagePreview(null);
-      if(fileInputRef.current) {
-          fileInputRef.current.value = "";
-      }
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   async function onSubmit(data: ProfileFormValues) {
     if (!user || !firestore || !app || !studentData) {
-        toast({ variant: "destructive", title: "Error", description: "User or Firebase services not available." });
-        return;
+      toast({ variant: "destructive", title: "Error", description: "User or Firebase services not available." });
+      return;
     }
-    
+
     setIsSaving(true);
-    
+
     try {
-        const auth = getAuth(app);
-        const storage = getStorage(app);
+      const auth = getAuth(app);
+      const storage = getStorage(app);
 
-        const hasPhotoChanged = imageFile !== null;
+      const hasPhotoChanged = imageFile !== null;
 
-        if (!isDirty && !hasPhotoChanged) {
-            toast({ title: "No changes to save." });
-            setIsSaving(false);
-            return;
+      if (!isDirty && !hasPhotoChanged) {
+        toast({ title: "No changes to save." });
+        setIsSaving(false);
+        return;
+      }
+
+      const authUpdates: { displayName?: string; photoURL?: string } = {};
+      const firestoreUpdates: { [key: string]: any } = {};
+
+      if (hasPhotoChanged && imageFile) {
+        const fileRef = storageRef(storage, `avatars/${user.uid}`);
+        const snapshot = await uploadBytes(fileRef, imageFile);
+        const newPhotoURL = await getDownloadURL(snapshot.ref);
+        authUpdates.photoURL = newPhotoURL;
+        firestoreUpdates.photoURL = newPhotoURL;
+      }
+
+      if (isDirty) {
+        if (data.name !== studentData.name) {
+          authUpdates.displayName = data.name;
         }
+        firestoreUpdates.displayName = data.name;
+        firestoreUpdates.phone = data.phone;
+        firestoreUpdates.age = data.age;
+        firestoreUpdates.gender = data.gender;
+        firestoreUpdates.educationalBackground = data.educationalBackground;
+      }
 
-        const authUpdates: { displayName?: string; photoURL?: string } = {};
-        const firestoreUpdates: { [key: string]: any } = {};
+      // Update Firebase Auth
+      if (Object.keys(authUpdates).length > 0 && auth.currentUser) {
+        await updateProfile(auth.currentUser, authUpdates);
+      }
 
-        if (hasPhotoChanged && imageFile) {
-            const fileRef = storageRef(storage, `avatars/${user.uid}`);
-            const snapshot = await uploadBytes(fileRef, imageFile);
-            const newPhotoURL = await getDownloadURL(snapshot.ref);
-            authUpdates.photoURL = newPhotoURL;
-            firestoreUpdates.photoURL = newPhotoURL;
-        }
+      // Update Firestore `users` collection
+      if (Object.keys(firestoreUpdates).length > 0) {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        await setDoc(userDocRef, firestoreUpdates, { merge: true });
+      }
 
-        if (isDirty) {
-            if (data.name !== studentData.name) {
-                authUpdates.displayName = data.name;
-            }
-            firestoreUpdates.displayName = data.name;
-            firestoreUpdates.phone = data.phone;
-            firestoreUpdates.age = data.age;
-            firestoreUpdates.gender = data.gender;
-            firestoreUpdates.educationalBackground = data.educationalBackground;
-        }
-
-        // Update Firebase Auth
-        if (Object.keys(authUpdates).length > 0 && auth.currentUser) {
-            await updateProfile(auth.currentUser, authUpdates);
-        }
-        
-        // Update Firestore `users` collection
-        if (Object.keys(firestoreUpdates).length > 0) {
-            const userDocRef = doc(firestore, 'users', user.uid);
-            await setDoc(userDocRef, firestoreUpdates, { merge: true });
-        }
-
-        // Update student data in local state/storage to keep UI in sync
-        updateStudent({
-            ...studentData,
-            ...data,
-        });
+      // Update student data in local state/storage to keep UI in sync
+      updateStudent({
+        ...studentData,
+        ...data,
+      });
 
 
-        toast({ title: "Profile updated successfully" });
-        resetImageSelection();
-        form.reset(data, { keepIsDirty: false });
+      toast({ title: "Profile updated successfully" });
+      resetImageSelection();
+      form.reset(data, { keepIsDirty: false });
 
     } catch (error: any) {
-        toast({
-            variant: "destructive",
-            title: "Update Failed",
-            description: error.message,
-        });
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error.message,
+      });
     } finally {
-        setIsSaving(false);
+      setIsSaving(false);
     }
   }
 
   async function onPasswordSubmit(data: PasswordFormValues) {
     if (!user) {
-        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to change your password.' });
-        return;
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to change your password.' });
+      return;
     }
 
     setIsPasswordSaving(true);
@@ -212,25 +212,25 @@ export default function StudentProfilePage() {
     const credential = EmailAuthProvider.credential(user.email, data.currentPassword);
 
     try {
-        await reauthenticateWithCredential(user, credential);
-        await updatePassword(user, data.newPassword);
-        
-        toast({ title: 'Password updated successfully' });
-        passwordForm.reset();
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, data.newPassword);
+
+      toast({ title: 'Password updated successfully' });
+      passwordForm.reset();
     } catch (error: any) {
-        let description = 'An unexpected error occurred.';
-        if (error.code === 'auth/invalid-credential') {
-            description = 'The current password you entered is incorrect.';
-        } else if (error.code === 'auth/weak-password') {
-            description = 'The new password is too weak. Please choose a stronger password.';
-        }
-        toast({
-            variant: 'destructive',
-            title: 'Password Change Failed',
-            description: description,
-        });
+      let description = 'An unexpected error occurred.';
+      if (error.code === 'auth/invalid-credential') {
+        description = 'The current password you entered is incorrect.';
+      } else if (error.code === 'auth/weak-password') {
+        description = 'The new password is too weak. Please choose a stronger password.';
+      }
+      toast({
+        variant: 'destructive',
+        title: 'Password Change Failed',
+        description: description,
+      });
     } finally {
-        setIsPasswordSaving(false);
+      setIsPasswordSaving(false);
     }
   }
 
@@ -242,17 +242,17 @@ export default function StudentProfilePage() {
       </div>
     );
   }
-  
+
   if (studentData === null) {
-      return (
-           <div className="flex h-full w-full items-center justify-center">
-                <p className="text-muted-foreground">Could not find student data for {user?.email}.</p>
-            </div>
-      )
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <p className="text-muted-foreground">Could not find student data for {user?.email}.</p>
+      </div>
+    )
   }
 
-  const lastLogin = user?.metadata.lastSignInTime 
-    ? new Date(user.metadata.lastSignInTime).toLocaleString() 
+  const lastLogin = user?.metadata.lastSignInTime
+    ? new Date(user.metadata.lastSignInTime).toLocaleString()
     : 'Not available';
 
   return (
@@ -268,12 +268,12 @@ export default function StudentProfilePage() {
 
       <div className="grid gap-6">
         <Card>
-            <CardHeader>
-                <CardTitle>Profile Overview</CardTitle>
-                <CardDescription>
-                    Your personal and academic information.
-                </CardDescription>
-            </CardHeader>
+          <CardHeader>
+            <CardTitle>Profile Overview</CardTitle>
+            <CardDescription>
+              Your personal and academic information.
+            </CardDescription>
+          </CardHeader>
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div className="relative">
@@ -301,200 +301,200 @@ export default function StudentProfilePage() {
                   className="hidden"
                   accept="image/png, image/jpeg"
                 />
-                 {imagePreview && (
-                    <Button type="button" variant="ghost" size="sm" onClick={resetImageSelection} className="mt-2 text-xs">
-                        Cancel
-                    </Button>
+                {imagePreview && (
+                  <Button type="button" variant="ghost" size="sm" onClick={resetImageSelection} className="mt-2 text-xs">
+                    Cancel
+                  </Button>
                 )}
               </div>
             </div>
-             <Separator className="my-6" />
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-                <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <div><p className="text-muted-foreground">Email</p><p className="font-semibold">{studentData.email}</p></div>
-                </div>
-                 <div className="flex items-center gap-3">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <div><p className="text-muted-foreground">Role</p><p className="font-semibold capitalize">{userProfile?.role}</p></div>
-                </div>
-                 <div className="flex items-center gap-3">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div><p className="text-muted-foreground">Last Login</p><p className="font-semibold">{lastLogin}</p></div>
-                </div>
-                 <div className="flex items-center gap-3">
-                    <GitBranch className="h-4 w-4 text-muted-foreground" />
-                    <div><p className="text-muted-foreground">Batch</p><p className="font-semibold">{studentData.batch}</p></div>
-                </div>
-                 <div className="flex items-center gap-3">
-                    <Landmark className="h-4 w-4 text-muted-foreground" />
-                    <div><p className="text-muted-foreground">Class / Dept</p><p className="font-semibold">{studentData.class}</p></div>
-                </div>
-             </div>
+            <Separator className="my-6" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+              <div className="flex items-center gap-3">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <div><p className="text-muted-foreground">Email</p><p className="font-semibold">{studentData.email}</p></div>
+              </div>
+              <div className="flex items-center gap-3">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <div><p className="text-muted-foreground">Role</p><p className="font-semibold capitalize">{userProfile?.role}</p></div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <div><p className="text-muted-foreground">Last Login</p><p className="font-semibold">{lastLogin}</p></div>
+              </div>
+              <div className="flex items-center gap-3">
+                <GitBranch className="h-4 w-4 text-muted-foreground" />
+                <div><p className="text-muted-foreground">Batch</p><p className="font-semibold">{studentData.batch}</p></div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Landmark className="h-4 w-4 text-muted-foreground" />
+                <div><p className="text-muted-foreground">Class / Dept</p><p className="font-semibold">{studentData.class}</p></div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-            <CardHeader>
-                <CardTitle>Update Profile</CardTitle>
-                <CardDescription>
-                    Change your personal information. Email and Roll Number cannot be changed.
-                </CardDescription>
-            </CardHeader>
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)}>
-                    <CardContent className="space-y-6">
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <FormField
-                                control={form.control}
-                                name="name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Full Name</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="Your full name" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name="phone"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Phone Number</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="Your phone number" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                       </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <FormField
-                                control={form.control}
-                                name="age"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Age</FormLabel>
-                                    <FormControl>
-                                      <Input type="number" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name="gender"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Gender</FormLabel>
-                                    <Select
-                                      onValueChange={field.onChange}
-                                      value={field.value}
-                                    >
-                                      <FormControl>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Select gender" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        <SelectItem value="Male">Male</SelectItem>
-                                        <SelectItem value="Female">Female</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                        </div>
-                         <FormField
-                            control={form.control}
-                            name="educationalBackground"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Educational Background</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="e.g. High School Diploma" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </CardContent>
-                    <CardFooter className="flex-col items-start gap-4">
-                        <Button type="submit" disabled={(!isDirty && !imageFile) || isSaving}>
-                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save Changes
-                        </Button>
-                    </CardFooter>
-                </form>
-            </Form>
+          <CardHeader>
+            <CardTitle>Update Profile</CardTitle>
+            <CardDescription>
+              Change your personal information. Email and Roll Number cannot be changed.
+            </CardDescription>
+          </CardHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your full name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your phone number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="age"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Age</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="gender"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Gender</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select gender" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="educationalBackground"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Educational Background</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. High School Diploma" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+              <CardFooter className="flex-col items-start gap-4">
+                <Button type="submit" disabled={(!isDirty && !imageFile) || isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Changes
+                </Button>
+              </CardFooter>
+            </form>
+          </Form>
         </Card>
         <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><KeyRound className="w-5 h-5" /> Change Password</CardTitle>
-                <CardDescription>
-                    Update your account password.
-                </CardDescription>
-            </CardHeader>
-            <Form {...passwordForm}>
-                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
-                    <CardContent className="space-y-6">
-                        <FormField
-                            control={passwordForm.control}
-                            name="currentPassword"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Current Password</FormLabel>
-                                    <FormControl>
-                                        <Input type="password" placeholder="••••••••" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={passwordForm.control}
-                            name="newPassword"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>New Password</FormLabel>
-                                    <FormControl>
-                                        <Input type="password" placeholder="••••••••" {...field} />
-                                    </FormControl>
-                                     <FormDescription>
-                                        Password must be at least 8 characters long.
-                                    </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={passwordForm.control}
-                            name="confirmPassword"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Confirm New Password</FormLabel>
-                                    <FormControl>
-                                        <Input type="password" placeholder="••••••••" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </CardContent>
-                    <CardFooter>
-                        <Button type="submit" disabled={isPasswordSaving}>
-                            {isPasswordSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Update Password
-                        </Button>
-                    </CardFooter>
-                </form>
-            </Form>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><KeyRound className="w-5 h-5" /> Change Password</CardTitle>
+            <CardDescription>
+              Update your account password.
+            </CardDescription>
+          </CardHeader>
+          <Form {...passwordForm}>
+            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
+              <CardContent className="space-y-6">
+                <FormField
+                  control={passwordForm.control}
+                  name="currentPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Current Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={passwordForm.control}
+                  name="newPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Password must be at least 8 characters long.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={passwordForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm New Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+              <CardFooter>
+                <Button type="submit" disabled={isPasswordSaving}>
+                  {isPasswordSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Update Password
+                </Button>
+              </CardFooter>
+            </form>
+          </Form>
         </Card>
       </div>
     </>

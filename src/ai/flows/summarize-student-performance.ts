@@ -8,8 +8,8 @@
  * - SummarizeStudentPerformanceOutput - The return type for the summarizeStudentPerformance function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { openrouter, MODEL } from '@/ai/genkit';
+import { z } from 'zod';
 
 const SummarizeStudentPerformanceInputSchema = z.object({
   name: z.string().describe('The name of the student.'),
@@ -38,33 +38,38 @@ const SummarizeStudentPerformanceInputSchema = z.object({
 export type SummarizeStudentPerformanceInput = z.infer<typeof SummarizeStudentPerformanceInputSchema>;
 
 const SummarizeStudentPerformanceOutputSchema = z.object({
-  summary: z.string().describe('A concise summary of the student’s overall performance.'),
+  summary: z.string().describe('A concise summary of the student\'s overall performance.'),
 });
 export type SummarizeStudentPerformanceOutput = z.infer<typeof SummarizeStudentPerformanceOutputSchema>;
 
 export async function summarizeStudentPerformance(
   input: SummarizeStudentPerformanceInput
 ): Promise<SummarizeStudentPerformanceOutput> {
-  return summarizeStudentPerformanceFlow(input);
+  const prompt = `Summarize the overall performance of student ${input.name} based on the following metrics and AI predictions:
+
+GPA: ${input.gpa}
+Internal Mark 1: ${input.internalMark1}
+Internal Mark 2: ${input.internalMark2}
+Average Mark Percentage: ${input.averageMarkPercentage}
+Attendance Percentage: ${input.attendancePercentage}
+Assignment Completion Percentage: ${input.assignmentCompletionPercentage}
+Pending Assignments: ${input.pendingAssignments}
+Risk Level: ${input.riskLevel}
+Outcome: ${input.outcome}
+Grade Category: ${input.gradeCategory}
+Confidence/Risk Probability: ${input.confidenceOrRiskProbability}
+
+Provide a concise summary (around 50-75 words) highlighting key strengths, weaknesses, and potential areas of concern.
+
+Return ONLY a JSON object with this exact format: { "summary": "..." }`;
+
+  const completion = await openrouter.chat.completions.create({
+    model: MODEL,
+    messages: [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+  });
+
+  const content = completion.choices[0]?.message?.content || '{}';
+  const parsed = JSON.parse(content);
+  return SummarizeStudentPerformanceOutputSchema.parse(parsed);
 }
-
-const summarizeStudentPerformancePrompt = ai.definePrompt({
-  name: 'summarizeStudentPerformancePrompt',
-  input: {schema: SummarizeStudentPerformanceInputSchema},
-  output: {schema: SummarizeStudentPerformanceOutputSchema},
-  prompt: `Summarize the overall performance of student {{name}} based on the following metrics and AI predictions:\n\nGPA: {{gpa}}\nInternal Mark 1: {{internalMark1}}\nInternal Mark 2: {{internalMark2}}\nAverage Mark Percentage: {{averageMarkPercentage}}\nAttendance Percentage: {{attendancePercentage}}\nAssignment Completion Percentage: {{assignmentCompletionPercentage}}\nPending Assignments: {{pendingAssignments}}\nRisk Level: {{riskLevel}}\nOutcome: {{outcome}}\nGrade Category: {{gradeCategory}}\nConfidence/Risk Probability: {{confidenceOrRiskProbability}}\n\nProvide a concise summary (around 50-75 words) highlighting key strengths, weaknesses, and potential areas of concern.`,
-});
-
-const summarizeStudentPerformanceFlow = ai.defineFlow(
-  {
-    name: 'summarizeStudentPerformanceFlow',
-    inputSchema: SummarizeStudentPerformanceInputSchema,
-    outputSchema: SummarizeStudentPerformanceOutputSchema,
-  },
-  async input => {
-    const {output} = await summarizeStudentPerformancePrompt(input);
-    return {
-      ...output,
-    };
-  }
-);

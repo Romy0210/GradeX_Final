@@ -14,20 +14,21 @@ type AcademicGroupOverviewProps = {
 }
 
 const groupStudents = (students: Student[]) => {
-  return students.reduce((acc, student) => {
-    const { batch, class: className, semester } = student;
-    const groupKey = `${batch} > ${className}`;
-    if (!acc[groupKey]) acc[groupKey] = {};
-    if (!acc[groupKey][semester]) acc[groupKey][semester] = { students: [], highRisk: 0, totalGpa: 0 };
-    
-    acc[groupKey][semester].students.push(student);
-    acc[groupKey][semester].totalGpa += student.gpa;
-    if (student.riskLevel === 'High') {
-      acc[groupKey][semester].highRisk++;
-    }
-    
-    return acc;
-  }, {} as Record<string, Record<string, { students: Student[], highRisk: number, totalGpa: number }>>);
+    return students.reduce((acc, student) => {
+        const { batch, class: className, semester } = student;
+        const groupKey = `${batch} > ${className}`;
+        if (!acc[groupKey]) acc[groupKey] = {};
+        if (!acc[groupKey][semester]) acc[groupKey][semester] = { students: [], highRisk: 0, totalGpa: 0 };
+
+        acc[groupKey][semester].students.push(student);
+        acc[groupKey][semester].totalGpa += student.gpa;
+        const isHighRisk = student.riskLevel === 'High' || (student.subjectAnalyses?.some(sub => sub.riskLevel === 'High') ?? false);
+        if (isHighRisk) {
+            acc[groupKey][semester].highRisk++;
+        }
+
+        return acc;
+    }, {} as Record<string, Record<string, { students: Student[], highRisk: number, totalGpa: number }>>);
 };
 
 

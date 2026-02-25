@@ -23,6 +23,20 @@ service cloud.firestore {
         // The rule requires the document to have an 'email' field that matches the user's authenticated email.
         // This is secure and allows the client query `where('email', '==', user.email)` to work.
         allow read: if 'email' in resource.data && resource.data.email == request.auth.token.email;
+
+        // A student can update their own record (needed for profile edits).
+        allow update: if 'email' in resource.data && resource.data.email == request.auth.token.email;
+    }
+
+    // Rules for app settings
+    match /settings/{document} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Rules for activity logs
+    match /activityLogs/{logId} {
+      allow read, write: if isAdmin();
     }
   }
 }

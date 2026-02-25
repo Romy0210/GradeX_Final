@@ -8,11 +8,11 @@
  * - PersonalizedRecommendationsOutput - The return type for the generatePersonalizedRecommendations function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { openrouter, MODEL } from '@/ai/genkit';
+import { z } from 'zod';
 
 const SubjectAnalysisSchema = z.object({
-  subjectId: z.string(),
+  subjectId: z.coerce.string(),
   subjectName: z.string(),
   riskLevel: z.enum(['Low', 'Medium', 'High']),
   outcome: z.enum(['Pass', 'Fail']),
@@ -33,9 +33,9 @@ const PersonalizedRecommendationsInputSchema = z.object({
 export type PersonalizedRecommendationsInput = z.infer<typeof PersonalizedRecommendationsInputSchema>;
 
 const SubjectRecommendationSchema = z.object({
-    subjectId: z.string(),
-    subjectName: z.string(),
-    recommendation: z.string().describe('A paragraph of AI-driven recommendations specific to this subject.'),
+  subjectId: z.coerce.string(),
+  subjectName: z.string(),
+  recommendation: z.string().describe('A paragraph of AI-driven recommendations specific to this subject.'),
 });
 
 const PersonalizedRecommendationsOutputSchema = z.object({
@@ -49,55 +49,51 @@ export type PersonalizedRecommendationsOutput = z.infer<typeof PersonalizedRecom
 export async function generatePersonalizedRecommendations(
   input: PersonalizedRecommendationsInput
 ): Promise<PersonalizedRecommendationsOutput> {
-  return generatePersonalizedRecommendationsFlow(input);
-}
+  let subjectSection = '';
+  if (input.subjectAnalyses && input.subjectAnalyses.length > 0) {
+    subjectSection = `
+  **Part 2: Subject-Specific Recommendations**
+  Now, analyze the performance for each subject and provide a specific, actionable recommendation for each one. The recommendation should be a concise paragraph (about 40-60 words) tailored to the subject's specific risk level, grade, and attendance.
 
-const prompt = ai.definePrompt({
-  name: 'personalizedRecommendationsPrompt',
-  input: {schema: PersonalizedRecommendationsInputSchema},
-  output: {schema: PersonalizedRecommendationsOutputSchema},
-  prompt: `You are an AI-powered academic advisor. Your task is to generate personalized recommendations for a student based on their overall performance and subject-specific analysis.
+  Subject-Wise Data:
+${input.subjectAnalyses.map(s => `  - Subject: ${s.subjectName}
+    - Risk Level: ${s.riskLevel}
+    - Predicted Grade: ${s.gradeCategory}
+    - Attendance: ${s.subjectAttendancePercentage ?? 0}%`).join('\n')}
+  
+  For each subject, generate a recommendation. For high-risk subjects, suggest revision strategies, practice, or mentoring. For subjects with low attendance, specifically mention the need to improve it, even if the marks are good. For medium-risk, suggest improvement areas. For low-risk, suggest advanced topics or challenges.
+
+  Include a "subjectRecommendations" array in the output with objects containing "subjectId", "subjectName", and "recommendation" for each subject.`;
+  }
+
+  const prompt = `You are an AI-powered academic advisor. Your task is to generate personalized recommendations for a student based on their overall performance and subject-specific analysis.
 
   **Part 1: Overall Recommendations**
   Based on the student's overall data, provide tailored recommendations in three categories: Academic, Behavioral, and Intervention. For each category, provide a single, well-written paragraph of about 50-75 words.
 
   Overall Student Data:
-  - Risk Level: {{riskLevel}}
-  - Predicted Outcome: {{outcome}}
-  - Predicted Grade Category: {{gradeCategory}}
-  - Academic Performance Summary: {{academicPerformance}}
-  - Overall Attendance: {{attendancePercentage}}%
-  - Assignment Completion: {{assignmentCompletionPercentage}}%
-  - Pending Assignments: {{pendingAssignments}}
+  - Risk Level: ${input.riskLevel}
+  - Predicted Outcome: ${input.outcome}
+  - Predicted Grade Category: ${input.gradeCategory}
+  - Academic Performance Summary: ${input.academicPerformance}
+  - Overall Attendance: ${input.attendancePercentage}%
+  - Assignment Completion: ${input.assignmentCompletionPercentage}%
+  - Pending Assignments: ${input.pendingAssignments}
 
-  **Part 2: Subject-Specific Recommendations**
-  {{#if subjectAnalyses}}
-  Now, analyze the performance for each subject and provide a specific, actionable recommendation for each one. The recommendation should be a concise paragraph (about 40-60 words) tailored to the subject's specific risk level, grade, and attendance.
-
-  Subject-Wise Data:
-  {{#each subjectAnalyses}}
-  - Subject: {{subjectName}}
-    - Risk Level: {{riskLevel}}
-    - Predicted Grade: {{gradeCategory}}
-    - Attendance: {{subjectAttendancePercentage}}%
-  {{/each}}
-  
-  For each subject, generate a recommendation. For high-risk subjects, suggest revision strategies, practice, or mentoring. For subjects with low attendance, specifically mention the need to improve it, even if the marks are good. For medium-risk, suggest improvement areas. For low-risk, suggest advanced topics or challenges.
-  {{/if}}
+  ${subjectSection}
   
   **Output Format**
-  Generate a single JSON object that strictly follows the output schema. It must contain 'academicRecommendations', 'behavioralRecommendations', and 'interventionRecommendations' fields for the overall summary. If subject data is provided, it must also include a 'subjectRecommendations' array, with an object for each subject containing 'subjectId', 'subjectName', and 'recommendation'.
-  `,
-});
+  Generate a single JSON object with these fields: "academicRecommendations", "behavioralRecommendations", "interventionRecommendations"${input.subjectAnalyses ? ', and "subjectRecommendations" (array of {subjectId, subjectName, recommendation})' : ''}.
+  
+  Return ONLY valid JSON.`;
 
-const generatePersonalizedRecommendationsFlow = ai.defineFlow(
-  {
-    name: 'generatePersonalizedRecommendationsFlow',
-    inputSchema: PersonalizedRecommendationsInputSchema,
-    outputSchema: PersonalizedRecommendationsOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);
+  const completion = await openrouter.chat.completions.create({
+    model: MODEL,
+    messages: [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+  });
+
+  const content = completion.choices[0]?.message?.content || '{}';
+  const parsed = JSON.parse(content);
+  return PersonalizedRecommendationsOutputSchema.parse(parsed);
+}

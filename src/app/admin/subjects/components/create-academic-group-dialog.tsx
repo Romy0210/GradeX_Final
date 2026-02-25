@@ -38,23 +38,24 @@ export function CreateAcademicGroupDialog() {
     defaultValues: { batch: "", class: "", semester: "" },
   });
 
-  const onSubmit = (data: GroupFormValues) => {
-    const success = createAcademicGroup(data);
-    if (success) {
-      toast({
-        title: "Academic Group Created",
-        description: `${data.batch} - ${data.class} - Semester ${data.semester} has been added.`,
-      });
-      setOpen(false);
-      form.reset();
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Group Already Exists",
-        description: "An academic group with this batch, class, and semester already exists.",
-      });
-    }
-  };
+const onSubmit = async (data: GroupFormValues) => {
+  const success = await createAcademicGroup(data);
+
+  if (success) {
+    toast({
+      title: "Academic Group Created",
+      description: `${data.batch} - ${data.class} - Semester ${data.semester} has been added.`,
+    });
+    setOpen(false);
+    form.reset();
+  } else {
+    toast({
+      variant: "destructive",
+      title: "Group Already Exists",
+      description: "An academic group with this batch, class, and semester already exists.",
+    });
+  }
+};
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

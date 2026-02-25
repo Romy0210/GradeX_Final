@@ -8,8 +8,8 @@
  * - PredictStudentRiskLevelOutput - The return type for the predictStudentRiskLevel function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { openrouter, MODEL } from '@/ai/genkit';
+import { z } from 'zod';
 
 const PredictStudentRiskLevelInputSchema = z.object({
   gpa: z.number().describe('GPA out of 10'),
@@ -30,22 +30,15 @@ export type PredictStudentRiskLevelOutput = z.infer<typeof PredictStudentRiskLev
 export async function predictStudentRiskLevel(
   input: PredictStudentRiskLevelInput
 ): Promise<PredictStudentRiskLevelOutput> {
-  return predictStudentRiskLevelFlow(input);
-}
-
-const predictStudentRiskLevelPrompt = ai.definePrompt({
-  name: 'predictStudentRiskLevelPrompt',
-  input: {schema: PredictStudentRiskLevelInputSchema},
-  output: {schema: PredictStudentRiskLevelOutputSchema},
-  prompt: `You are an expert AI system designed to predict student academic risk with high accuracy. Your analysis must be based on a strict set of rules.
+  const prompt = `You are an expert AI system designed to predict student academic risk with high accuracy. Your analysis must be based on a strict set of rules.
 
 Analyze the student's data and predict their risk level.
 
 **Student Data:**
-- GPA (out of 10): {{gpa}}
-- Attendance Percentage: {{attendancePercentage}}%
-- Assignment Completion Percentage: {{assignmentCompletion}}%
-- Pending Assignments: {{pendingAssignments}}
+- GPA (out of 10): ${input.gpa}
+- Attendance Percentage: ${input.attendancePercentage}%
+- Assignment Completion Percentage: ${input.assignmentCompletion}%
+- Pending Assignments: ${input.pendingAssignments}
 
 **Prediction Rules:**
 
@@ -63,17 +56,15 @@ Analyze the student's data and predict their risk level.
 
 For the \`explanation\`, briefly state which rules were triggered to determine the risk level.
 
-Provide the response in a JSON object that matches the specified output schema. The risk level must be one of 'low', 'medium', or 'high'.`,
-});
+Return ONLY a JSON object with this exact format: { "riskLevel": "low" | "medium" | "high", "explanation": "..." }`;
 
-const predictStudentRiskLevelFlow = ai.defineFlow(
-  {
-    name: 'predictStudentRiskLevelFlow',
-    inputSchema: PredictStudentRiskLevelInputSchema,
-    outputSchema: PredictStudentRiskLevelOutputSchema,
-  },
-  async input => {
-    const {output} = await predictStudentRiskLevelPrompt(input);
-    return output!;
-  }
-);
+  const completion = await openrouter.chat.completions.create({
+    model: MODEL,
+    messages: [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+  });
+
+  const content = completion.choices[0]?.message?.content || '{}';
+  const parsed = JSON.parse(content);
+  return PredictStudentRiskLevelOutputSchema.parse(parsed);
+}

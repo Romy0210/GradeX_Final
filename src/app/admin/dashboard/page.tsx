@@ -8,9 +8,7 @@ import QuickActions from './components/quick-actions';
 import RecentActivity from './components/recent-activity';
 import AcademicGroupOverview from './components/academic-group-overview';
 import RiskHeatmap from './components/risk-heatmap';
-import PredictiveAlerts from './components/predictive-alerts';
 import SubjectPerformanceSnapshot from './components/subject-performance-snapshot';
-import CorrelationSummary from './components/correlation-summary';
 import { BookCopy, GraduationCap, ShieldAlert, ShieldCheck, Shield, TrendingUp, Users } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -32,9 +30,11 @@ export default function AdminDashboard() {
       };
     }
 
-    const highRiskCount = students.filter((s) => s.riskLevel === 'High').length;
-    const mediumRiskCount = students.filter((s) => s.riskLevel === 'Medium').length;
-    const lowRiskCount = students.filter((s) => s.riskLevel === 'Low').length;
+    const isHighRisk = (s: typeof students[0]) => s.riskLevel === 'High' || (s.subjectAnalyses?.some(sub => sub.riskLevel === 'High') ?? false);
+
+    const highRiskCount = students.filter(isHighRisk).length;
+    const mediumRiskCount = students.filter((s) => !isHighRisk(s) && s.riskLevel === 'Medium').length;
+    const lowRiskCount = students.filter((s) => !isHighRisk(s) && s.riskLevel === 'Low').length;
     const passingCount = students.filter((s) => s.outcome === 'Pass').length;
 
     return {
@@ -52,17 +52,18 @@ export default function AdminDashboard() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground">
-            Executive overview of student performance and risk factors.
+      <div className="flex flex-col md:flex-row md:items-center justify-between p-6 md:p-8 rounded-3xl bg-gradient-to-br from-primary/10 via-background to-background border border-border/50 shadow-sm mb-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+        <div className="relative z-10">
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground mb-1">Administrative Control Center</h1>
+          <p className="text-muted-foreground font-medium">
+            Executive overview of student performance, emerging risk factors, and actionable insights.
           </p>
         </div>
       </div>
-      
+
       {/* Executive KPI Row */}
-      <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-8">
         <StatCard
           title="Total Students"
           value={dashboardStats.totalStudents.toString()}
@@ -104,24 +105,29 @@ export default function AdminDashboard() {
       </div>
 
       {/* Main Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8 auto-rows-min">
-        <div className="lg:col-span-2 space-y-4 md:space-y-8">
-            <AcademicGroupOverview students={students} />
-            <RiskHeatmap students={students} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 auto-rows-min">
+        {/* Left Column - Core Academics */}
+        <div className="lg:col-span-2 flex flex-col gap-6 md:gap-8">
+          <AcademicGroupOverview students={students} />
         </div>
-         <div className="lg:col-span-1 space-y-4 md:space-y-8">
-            <PredictiveAlerts />
-            <CorrelationSummary students={students} />
+
+        {/* Right Column - Actions & Activity */}
+        <div className="lg:col-span-1 flex flex-col gap-6 md:gap-8">
+          <QuickActions />
+          <RecentActivity />
         </div>
-         <div className="lg:col-span-3">
-             <SubjectPerformanceSnapshot students={students} />
+
+        {/* Full Width Subject Snapshot */}
+        <div className="lg:col-span-3">
+          <SubjectPerformanceSnapshot students={students} />
         </div>
-         <div className="lg:col-span-2">
-            <AtRiskPreview data={students} />
+
+        {/* Bottom Row - Heatmap & Risk Preview */}
+        <div className="lg:col-span-2">
+          <RiskHeatmap students={students} />
         </div>
-        <div className="lg:col-span-1 space-y-4 md:space-y-8">
-            <RecentActivity />
-            <QuickActions />
+        <div className="lg:col-span-1">
+          <AtRiskPreview data={students} />
         </div>
       </div>
     </>

@@ -36,6 +36,15 @@ export function AssignmentsTable({ data }: { data: MonitoredData[] }) {
         setAlertingStudent(null);
     };
 
+    // Group the flattened data by studentId
+    const groupedData = data.reduce((acc, item) => {
+        if (!acc[item.studentId]) {
+            acc[item.studentId] = [];
+        }
+        acc[item.studentId].push(item);
+        return acc;
+    }, {} as Record<string, MonitoredData[]>);
+
     return (
         <>
             <div className="border rounded-lg">
@@ -53,32 +62,38 @@ export function AssignmentsTable({ data }: { data: MonitoredData[] }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {data.length > 0 ? data.map(item => {
-                            const pending = item.totalAssignments - item.completedAssignments;
-                            const completionPercentage = item.totalAssignments > 0 ? (item.completedAssignments / item.totalAssignments) * 100 : 100;
-                            const risk = getAssignmentRisk(completionPercentage);
-                            return (
-                                <TableRow key={`${item.studentId}-${item.subjectId}`}>
-                                    <TableCell>
-                                        <div className="font-medium">{item.studentName}</div>
-                                        <div className="text-sm text-muted-foreground">{item.studentId}</div>
-                                    </TableCell>
-                                    <TableCell>{item.subjectName}</TableCell>
-                                    <TableCell className="text-center font-mono">{item.totalAssignments}</TableCell>
-                                    <TableCell className="text-center font-mono">{item.completedAssignments}</TableCell>
-                                    <TableCell className="text-center font-mono">{pending < 0 ? 0 : pending}</TableCell>
-                                    <TableCell className="text-center font-mono">{completionPercentage.toFixed(1)}%</TableCell>
-                                    <TableCell className="text-center">
-                                        <Badge variant={getRiskBadgeVariant(risk)}>{risk}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" onClick={() => setAlertingStudent(item)}>
-                                            <Bell className="h-4 w-4" />
-                                            <span className="sr-only">Send Alert</span>
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            );
+                        {Object.values(groupedData).length > 0 ? Object.values(groupedData).map(group => {
+                            return group.map((item, index) => {
+                                const pending = item.totalAssignments - item.completedAssignments;
+                                const completionPercentage = item.totalAssignments > 0 ? (item.completedAssignments / item.totalAssignments) * 100 : 100;
+                                const risk = getAssignmentRisk(completionPercentage);
+                                const isFirstRow = index === 0;
+
+                                return (
+                                    <TableRow key={`${item.studentId}-${item.subjectId}`}>
+                                        {isFirstRow && (
+                                            <TableCell rowSpan={group.length} className="align-top border-r bg-muted/30">
+                                                <div className="font-medium">{item.studentName}</div>
+                                                <div className="text-xs text-muted-foreground mt-1">{item.studentId}</div>
+                                            </TableCell>
+                                        )}
+                                        <TableCell>{item.subjectName}</TableCell>
+                                        <TableCell className="text-center font-mono">{item.totalAssignments}</TableCell>
+                                        <TableCell className="text-center font-mono">{item.completedAssignments}</TableCell>
+                                        <TableCell className="text-center font-mono">{pending < 0 ? 0 : pending}</TableCell>
+                                        <TableCell className="text-center font-mono">{completionPercentage.toFixed(1)}%</TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant={getRiskBadgeVariant(risk)}>{risk}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" onClick={() => setAlertingStudent(item)}>
+                                                <Bell className="h-4 w-4" />
+                                                <span className="sr-only">Send Alert</span>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            });
                         }) : (
                             <TableRow>
                                 <TableCell colSpan={8} className="h-24 text-center">

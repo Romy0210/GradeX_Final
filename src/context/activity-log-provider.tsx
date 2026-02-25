@@ -2,26 +2,36 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useUser } from "@/firebase/auth/use-user";
+import { useFirestore } from "@/firebase";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  limit,
+  serverTimestamp,
+  Timestamp,
+} from "firebase/firestore";
 
-export type ActivityEventType = 
-    | "BULK_UPLOAD"
-    | "AI_ANALYSIS"
-    | "STUDENT_ADD"
-    | "STUDENT_UPDATE"
-    | "STUDENT_DELETE"
-    | "EXPORT"
-    | "SETTINGS_UPDATE";
+export type ActivityEventType =
+  | "BULK_UPLOAD"
+  | "AI_ANALYSIS"
+  | "STUDENT_ADD"
+  | "STUDENT_UPDATE"
+  | "STUDENT_DELETE"
+  | "EXPORT"
+  | "SETTINGS_UPDATE";
 
 export type Activity = {
-    id: string;
-    eventType: ActivityEventType;
-    description: string;
-    performedBy: string;
-    createdAt: string; // ISO string
+  id: string;
+  eventType: ActivityEventType;
+  description: string;
+  performedBy: string;
+  createdAt: string; // ISO string
 };
 
-const STORAGE_KEY = "gradex-activity-log";
-const LOG_LIMIT = 50; // Keep the log from growing indefinitely
+const LOG_LIMIT = 50;
 
 interface ActivityLogContextType {
   activities: Activity[];
@@ -31,57 +41,63 @@ interface ActivityLogContextType {
 const ActivityLogContext = createContext<ActivityLogContextType | undefined>(undefined);
 
 export function ActivityLogProvider({ children }: { children: ReactNode }) {
+  const firestore = useFirestore();
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [isClient, setIsClient] = useState(false);
   const { user } = useUser();
 
+  // Real-time listener for activity logs, ordered by createdAt descending, limited to 50
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    if (!firestore) return;
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    if (isClient) {
-      try {
-        const item = window.localStorage.getItem(STORAGE_KEY);
-        if (item) {
-          setActivities(JSON.parse(item));
-        }
-      } catch (error) {
-        console.error("Error reading activity log from localStorage.", error);
+    const q = query(
+      collection(firestore, "activityLogs"),
+      orderBy("createdAt", "desc"),
+      limit(LOG_LIMIT)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const logData: Activity[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          // Convert Firestore Timestamp to ISO string for consistency
+          let createdAtStr = new Date().toISOString();
+          if (data.createdAt instanceof Timestamp) {
+            createdAtStr = data.createdAt.toDate().toISOString();
+          } else if (typeof data.createdAt === 'string') {
+            createdAtStr = data.createdAt;
+          }
+          return {
+            id: docSnap.id,
+            eventType: data.eventType,
+            description: data.description,
+            performedBy: data.performedBy,
+            createdAt: createdAtStr,
+          } as Activity;
+        });
+        setActivities(logData);
+      },
+      (error) => {
+        console.error("Error listening to activity logs:", error);
       }
-    }
-  }, [isClient]);
+    );
 
-  // Persist to localStorage on change
-  useEffect(() => {
-    if (isClient) {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(activities));
-      } catch (error) {
-        console.error("Error writing activity log to localStorage", error);
-      }
-    }
-  }, [activities, isClient]);
+    return () => unsubscribe();
+  }, [firestore]);
 
-  const logActivity = useCallback((eventType: ActivityEventType, description: string) => {
-    const newActivity: Activity = {
-        id: crypto.randomUUID(),
+  const logActivity = useCallback(async (eventType: ActivityEventType, description: string) => {
+    if (!firestore) return;
+    try {
+      await addDoc(collection(firestore, "activityLogs"), {
         eventType,
         description,
         performedBy: user?.email ?? 'System',
-        createdAt: new Date().toISOString(),
-    };
-
-    setActivities(prevActivities => {
-        const updatedLog = [newActivity, ...prevActivities];
-        // Enforce a limit on the number of log entries
-        if (updatedLog.length > LOG_LIMIT) {
-            return updatedLog.slice(0, LOG_LIMIT);
-        }
-        return updatedLog;
-    });
-  }, [user]);
+        createdAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error logging activity to Firestore:", error);
+    }
+  }, [firestore, user]);
 
   const value = { activities, logActivity };
 
@@ -93,9 +109,9 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
 }
 
 export function useActivityLog() {
-    const context = useContext(ActivityLogContext);
-    if (context === undefined) {
-        throw new Error('useActivityLog must be used within an ActivityLogProvider');
-    }
-    return context;
+  const context = useContext(ActivityLogContext);
+  if (context === undefined) {
+    throw new Error('useActivityLog must be used within an ActivityLogProvider');
+  }
+  return context;
 }

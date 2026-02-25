@@ -12,17 +12,17 @@ import { AIPredictionPanel } from "@/app/admin/student/[id]/components/ai-predic
 
 
 type AlertInfo = {
-    type: 'risk' | 'assignments' | 'attendance';
-    severity: 'Warning' | 'Info';
-    title: string;
-    message: string;
-    timestamp: string;
+  type: 'risk' | 'assignments' | 'attendance';
+  severity: 'Warning' | 'Info';
+  title: string;
+  message: string;
+  timestamp: string;
 };
 
 const alertIcons = {
-    risk: <AlertTriangle className="h-4 w-4" />,
-    assignments: <Clock className="h-4 w-4" />,
-    attendance: <Users className="h-4 w-4" />,
+  risk: <AlertTriangle className="h-4 w-4" />,
+  assignments: <Clock className="h-4 w-4" />,
+  attendance: <Users className="h-4 w-4" />,
 };
 
 
@@ -32,46 +32,50 @@ export default function AISummaryPage() {
   const [student, setStudent] = useState<Student | null | undefined>(undefined);
 
   useEffect(() => {
-      if (!isUserLoading && user) {
-          const currentStudent = students.find((s) => s.email === user.email);
-          setStudent(currentStudent || null);
+    if (!isUserLoading && user) {
+      if (students.length === 0) {
+        setStudent(null);
+      } else {
+        const currentStudent = students.find((s) => s.authUid === user.uid || s.id === user.uid);
+        setStudent(currentStudent || null);
       }
+    }
   }, [user, students, isUserLoading]);
 
   const adminAlerts: AlertInfo[] = [];
 
-    if (student) {
-        // Rule 1: High Academic Risk
-        if (student.riskLevel === 'High') {
-            adminAlerts.push({
-                type: 'risk',
-                severity: 'Warning',
-                title: 'High Academic Risk Alert',
-                message: `Your overall academic performance has placed you in a high-risk category. Please review your AI summary and study plan for targeted recommendations.`,
-                timestamp: '1 hour ago'
-            });
-        }
-        // Rule 2: High number of pending assignments
-        if (student.pendingAssignments > 2) {
-            adminAlerts.push({
-                type: 'assignments',
-                severity: 'Warning',
-                title: `Admin Alert: ${student.pendingAssignments} Pending Assignments`,
-                message: `Your administrator has noted that you have a high number of pending assignments. Please prioritize completing these to improve your academic standing.`,
-                timestamp: '2 hours ago'
-            });
-        }
-        // Rule 3: Low attendance
-        if (student.attendancePercentage < 80) {
-            adminAlerts.push({
-                type: 'attendance',
-                severity: 'Warning',
-                title: 'Low Attendance Alert',
-                message: `Your overall attendance is currently ${student.attendancePercentage}%. Consistent attendance is crucial for success.`,
-                timestamp: '4 hours ago'
-            });
-        }
+  if (student) {
+    // Rule 1: High Academic Risk
+    if (student.riskLevel === 'High') {
+      adminAlerts.push({
+        type: 'risk',
+        severity: 'Warning',
+        title: 'High Academic Risk Alert',
+        message: `Your overall academic performance has placed you in a high-risk category. Please review your AI summary and study plan for targeted recommendations.`,
+        timestamp: '1 hour ago'
+      });
     }
+    // Rule 2: High number of pending assignments
+    if (student.pendingAssignments > 2) {
+      adminAlerts.push({
+        type: 'assignments',
+        severity: 'Warning',
+        title: `Admin Alert: ${student.pendingAssignments} Pending Assignments`,
+        message: `Your administrator has noted that you have a high number of pending assignments. Please prioritize completing these to improve your academic standing.`,
+        timestamp: '2 hours ago'
+      });
+    }
+    // Rule 3: Low attendance
+    if (student.attendancePercentage < 80) {
+      adminAlerts.push({
+        type: 'attendance',
+        severity: 'Warning',
+        title: 'Low Attendance Alert',
+        message: `Your overall attendance is currently ${student.attendancePercentage}%. Consistent attendance is crucial for success.`,
+        timestamp: '4 hours ago'
+      });
+    }
+  }
 
   // Loading state
   if (student === undefined || isUserLoading) {
@@ -98,14 +102,14 @@ export default function AISummaryPage() {
     <>
       <div className="flex flex-col gap-4">
         {adminAlerts.map((alert, index) => (
-            <Alert key={index} variant={alert.severity === 'Warning' ? 'destructive' : 'default'}>
-                {alertIcons[alert.type]}
-                <AlertTitle>{alert.title}</AlertTitle>
-                <AlertDescription>
-                    {alert.message}
-                    <span className="block text-xs text-muted-foreground mt-2">{alert.timestamp}</span>
-                </AlertDescription>
-            </Alert>
+          <Alert key={index} variant={alert.severity === 'Warning' ? 'destructive' : 'default'}>
+            {alertIcons[alert.type]}
+            <AlertTitle>{alert.title}</AlertTitle>
+            <AlertDescription>
+              {alert.message}
+              <span className="block text-xs text-muted-foreground mt-2">{alert.timestamp}</span>
+            </AlertDescription>
+          </Alert>
         ))}
       </div>
       <div className="flex items-center justify-between">
@@ -119,11 +123,11 @@ export default function AISummaryPage() {
         </div>
       </div>
       <div className="grid gap-4 md:gap-8 grid-cols-1 lg:grid-cols-2 auto-rows-min">
-          <div className="flex flex-col gap-4 md:gap-8">
-            <AIPredictionPanel predictionData={student} isLoading={false} />
-            <AIRecommendationsPanel recommendationsData={student} isLoading={isUserLoading} />
-          </div>
-          <StudyPlanPanel student={student} />
+        <div className="flex flex-col gap-4 md:gap-8">
+          <AIPredictionPanel predictionData={student} isLoading={false} />
+          <AIRecommendationsPanel recommendationsData={student} isLoading={isUserLoading} />
+        </div>
+        <StudyPlanPanel student={student} />
       </div>
     </>
   );

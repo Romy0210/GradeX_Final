@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useStudentData } from "@/context/student-data-provider";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Settings, FileDown, Zap, Clock, Info, AlertTriangle } from "lucide-react";
+import { Settings, FileDown, Zap, Clock, Info, AlertTriangle, Bell, Activity } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useSettings } from "@/context/settings-provider";
 import { useUser } from "@/firebase/auth/use-user";
@@ -54,7 +54,7 @@ const modelSettingsSchema = z.object({
 const notificationSettingsSchema = z.object({
   highRiskAlerts: z.boolean().default(true),
   mediumRiskAlerts: z.boolean().default(false),
-  alertFrequency: z.enum(["immediate", "daily"]),
+  alertFrequency: z.enum(["immediate", "daily", "conditional"]),
 });
 
 
@@ -83,12 +83,29 @@ export default function AdminSettingsPage() {
     defaultValues: {
       highRiskAlerts: true,
       mediumRiskAlerts: false,
-      alertFrequency: "daily",
+      alertFrequency: "conditional",
     },
   });
-  
+
   const watchedAlertFrequency = notificationForm.watch("alertFrequency");
-  
+  const watchedHighRisk = notificationForm.watch("highRiskAlerts");
+  const watchedMediumRisk = notificationForm.watch("mediumRiskAlerts");
+
+  const displayedStudents = students.filter(s => {
+    if (watchedHighRisk && s.riskLevel === 'High') return true;
+    if (watchedMediumRisk && s.riskLevel === 'Medium') return true;
+    return false;
+  });
+
+  const handleSendNotification = () => {
+    if (displayedStudents.length === 0) return;
+    logActivity("SETTINGS_UPDATE", `Sent alert notifications to ${displayedStudents.length} risk students.`);
+    toast({
+      title: "Notifications Sent",
+      description: `Alert notifications successfully sent to ${displayedStudents.length} students' dashboards.`,
+    });
+  };
+
   function onModelSubmit(data: ModelSettingsFormValues) {
     setModelParameters(data);
     logActivity("SETTINGS_UPDATE", `Model risk thresholds updated. High risk: ${data.highRiskThreshold}, Low risk: ${data.lowRiskThreshold}.`);
@@ -114,7 +131,7 @@ export default function AdminSettingsPage() {
       });
       return;
     }
-  
+
     const fileName = `GradeX_All_Students_${new Date().toISOString().split('T')[0]}.csv`;
     exportAllStudentsReport(students, { generatedBy: user?.email }, fileName);
     logActivity("EXPORT", `Exported all ${students.length} students to CSV.`);
@@ -125,7 +142,8 @@ export default function AdminSettingsPage() {
   };
 
   const handleExportHighRisk = () => {
-    const highRiskStudents = students.filter((s) => s.riskLevel === "High");
+    const isHighRisk = (s: typeof students[0]) => s.riskLevel === "High" || (s.subjectAnalyses?.some(sub => sub.riskLevel === "High") ?? false);
+    const highRiskStudents = students.filter(isHighRisk);
     if (highRiskStudents.length === 0) {
       toast({
         title: "No High-Risk Students",
@@ -133,9 +151,8 @@ export default function AdminSettingsPage() {
       });
       return;
     }
-    const fileName = `GradeX_High_Risk_Students_${
-      new Date().toISOString().split("T")[0]
-    }.csv`;
+    const fileName = `GradeX_High_Risk_Students_${new Date().toISOString().split("T")[0]
+      }.csv`;
     exportHighRiskReport(students, { generatedBy: user?.email }, fileName);
     logActivity("EXPORT", `Exported ${highRiskStudents.length} high-risk students to CSV.`);
     toast({
@@ -223,138 +240,186 @@ export default function AdminSettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
-                 <div className="space-y-4">
-                    <FormField
-                      control={notificationForm.control}
-                      name="highRiskAlerts"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">
-                              High-Risk Alerts
-                            </FormLabel>
-                            <FormDescription>
-                              Receive a dashboard toast when a student is flagged as high-risk.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={notificationForm.control}
-                      name="mediumRiskAlerts"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">
-                              Medium-Risk Alerts
-                            </FormLabel>
-                            <FormDescription>
-                               Receive a dashboard toast for medium-risk students.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                 </div>
+                <div className="space-y-4">
+                  <FormField
+                    control={notificationForm.control}
+                    name="highRiskAlerts"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            High-Risk Alerts
+                          </FormLabel>
+                          <FormDescription>
+                            Receive a dashboard toast when a student is flagged as high-risk.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={notificationForm.control}
+                    name="mediumRiskAlerts"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            Medium-Risk Alerts
+                          </FormLabel>
+                          <FormDescription>
+                            Receive a dashboard toast for medium-risk students.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
-                 <Separator />
-                
-                <TooltipProvider>
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <Label className="text-base font-semibold">Alert Delivery Mode</Label>
-                             <Tooltip>
-                                <TooltipTrigger asChild><button type="button"><Info className="w-4 h-4 text-muted-foreground" /></button></TooltipTrigger>
-                                <TooltipContent>
-                                    <p className="max-w-xs">
-                                        <b>Real-Time:</b> Instant triggers.
-                                        <br />
-                                        <b>Daily Digest:</b> Aggregated once per day.
-                                    </p>
-                                </TooltipContent>
-                            </Tooltip>
+                  {displayedStudents.length > 0 && (
+                    <div className="space-y-4 pt-4 border-t mt-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                          <Label className="text-base font-semibold">Risk Student Details</Label>
+                          <p className="text-sm text-muted-foreground">Students matching your alert criteria.</p>
                         </div>
-                        <p className="text-sm text-muted-foreground -mt-2">
-                           Choose how risk alerts are delivered to the dashboard.
-                        </p>
-                        
-                        <FormField
-                            control={notificationForm.control}
-                            name="alertFrequency"
-                            render={({ field }) => (
-                                <RadioGroup
-                                    onValueChange={field.onChange}
-                                    value={field.value}
-                                    className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                                >
-                                    <FormItem>
-                                        <Label htmlFor="freq-immediate" className="[&:has([data-state=checked])>div]:border-primary [&:has([data-state=checked])>div]:shadow-lg block cursor-pointer">
-                                            <RadioGroupItem value="immediate" id="freq-immediate" className="sr-only" />
-                                            <div className="p-4 rounded-lg border-2 border-muted bg-popover transition-all duration-200 hover:border-primary/50">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <div className="flex items-center gap-3">
-                                                        <Zap className="w-6 h-6 text-primary"/>
-                                                        <h3 className="font-semibold">Real-Time Alerts</h3>
-                                                    </div>
-                                                    <Badge variant="secondary">Recommended</Badge>
-                                                </div>
-                                                <p className="text-sm text-muted-foreground">Instant dashboard alerts when a student becomes high or medium risk.</p>
-                                            </div>
-                                        </Label>
-                                    </FormItem>
-                                    <FormItem>
-                                        <Label htmlFor="freq-daily" className="[&:has([data-state=checked])>div]:border-primary [&:has([data-state=checked])>div]:shadow-lg block cursor-pointer">
-                                            <RadioGroupItem value="daily" id="freq-daily" className="sr-only" />
-                                            <div className="p-4 rounded-lg border-2 border-muted bg-popover transition-all duration-200 hover:border-primary/50">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <Clock className="w-6 h-6 text-primary"/>
-                                                    <h3 className="font-semibold">Daily Summary</h3>
-                                                </div>
-                                                <p className="text-sm text-muted-foreground">Receive one consolidated dashboard notification per day, including all new high and medium-risk students.</p>
-                                            </div>
-                                        </Label>
-                                    </FormItem>
-                                </RadioGroup>
-                            )}
-                        />
-                        
-                        <div className="space-y-2 pt-2">
-                            <Label>Live Behavior Preview</Label>
-                            <div className="p-4 border rounded-lg bg-muted/50 text-sm">
-                                {watchedAlertFrequency === 'immediate' ? (
-                                    <div className="flex items-center gap-3">
-                                        <AlertTriangle className="w-5 h-5 text-destructive" />
-                                        <div>
-                                            <p className="font-semibold">Maria Garcia flagged as High Risk</p>
-                                            <p className="text-xs text-muted-foreground">Displayed immediately at 10:32 AM</p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-3">
-                                        <Clock className="w-5 h-5 text-muted-foreground" />
-                                        <div>
-                                            <p className="font-semibold">Daily Risk Summary – 3 High Risk, 2 Medium Risk</p>
-                                            <p className="text-xs text-muted-foreground">Delivered at 8:00 PM</p>
-                                        </div>
-                                    </div>
-                                )}
+                        <Button variant="secondary" onClick={handleSendNotification} type="button">
+                          <Bell className="w-4 h-4 mr-2" />
+                          Send Alert Notification
+                        </Button>
+                      </div>
+                      <div className="grid gap-2 max-h-64 overflow-y-auto pr-2">
+                        {displayedStudents.map(student => (
+                          <div key={student.id} className="p-3 border rounded-lg flex justify-between items-center bg-muted/30">
+                            <div>
+                              <p className="font-medium text-sm">{student.name}</p>
+                              <p className="text-xs text-muted-foreground">ID: {student.id} • Class: {student.class} • GPA: {student.gpa}</p>
                             </div>
-                        </div>
+                            <Badge variant={student.riskLevel === 'High' ? 'destructive' : 'secondary'}>
+                              {student.riskLevel} Risk
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                 </TooltipProvider>
+                  )}
+                </div>
+
+                <Separator />
+
+                <TooltipProvider>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-base font-semibold">Alert Delivery Mode</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild><button type="button"><Info className="w-4 h-4 text-muted-foreground" /></button></TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">
+                            <b>Real-Time:</b> Instant triggers.
+                            <br />
+                            <b>Daily Digest:</b> Aggregated once per day.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <p className="text-sm text-muted-foreground -mt-2">
+                      Choose how risk alerts are delivered to the dashboard.
+                    </p>
+
+                    <FormField
+                      control={notificationForm.control}
+                      name="alertFrequency"
+                      render={({ field }) => (
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                        >
+                          <FormItem className="h-full">
+                            <Label htmlFor="freq-immediate" className="[&:has([data-state=checked])>div]:border-primary [&:has([data-state=checked])>div]:shadow-lg block cursor-pointer h-full">
+                              <RadioGroupItem value="immediate" id="freq-immediate" className="sr-only" />
+                              <div className="p-4 h-full rounded-lg border-2 border-muted bg-popover transition-all duration-200 hover:border-primary/50 flex flex-col">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <Zap className="w-6 h-6 text-primary" />
+                                  <h3 className="font-semibold">Real-Time</h3>
+                                </div>
+                                <p className="text-sm text-muted-foreground">Instant alerts when a student becomes high or medium risk.</p>
+                              </div>
+                            </Label>
+                          </FormItem>
+                          <FormItem className="h-full">
+                            <Label htmlFor="freq-daily" className="[&:has([data-state=checked])>div]:border-primary [&:has([data-state=checked])>div]:shadow-lg block cursor-pointer h-full">
+                              <RadioGroupItem value="daily" id="freq-daily" className="sr-only" />
+                              <div className="p-4 h-full rounded-lg border-2 border-muted bg-popover transition-all duration-200 hover:border-primary/50 flex flex-col">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <Clock className="w-6 h-6 text-primary" />
+                                  <h3 className="font-semibold">Daily</h3>
+                                </div>
+                                <p className="text-sm text-muted-foreground">Receive one consolidated notification per day with all risks.</p>
+                              </div>
+                            </Label>
+                          </FormItem>
+                          <FormItem className="h-full">
+                            <Label htmlFor="freq-conditional" className="[&:has([data-state=checked])>div]:border-primary [&:has([data-state=checked])>div]:shadow-lg block cursor-pointer h-full">
+                              <RadioGroupItem value="conditional" id="freq-conditional" className="sr-only" />
+                              <div className="p-4 h-full rounded-lg border-2 border-muted bg-popover transition-all duration-200 hover:border-primary/50 flex flex-col">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Activity className="w-5 h-5 text-primary" />
+                                    <h3 className="font-semibold">Smart Alerts</h3>
+                                  </div>
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">New</Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground">3 days/week for single risk. Daily for multiple risks (incl. attendance & assignments).</p>
+                              </div>
+                            </Label>
+                          </FormItem>
+                        </RadioGroup>
+                      )}
+                    />
+
+                    <div className="space-y-2 pt-2">
+                      <Label>Live Behavior Preview</Label>
+                      <div className="p-4 border rounded-lg bg-muted/50 text-sm">
+                        {watchedAlertFrequency === 'immediate' ? (
+                          <div className="flex items-center gap-3">
+                            <AlertTriangle className="w-5 h-5 text-destructive" />
+                            <div>
+                              <p className="font-semibold">{displayedStudents.length > 0 ? displayedStudents[0].name : "Student"} flagged as High Risk</p>
+                              <p className="text-xs text-muted-foreground">Displayed immediately at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                          </div>
+                        ) : watchedAlertFrequency === 'conditional' ? (
+                          <div className="flex items-center gap-3">
+                            <Activity className="w-5 h-5 text-primary" />
+                            <div>
+                              <p className="font-semibold">Smart Delivery Active</p>
+                              <p className="text-xs text-muted-foreground">Alerting 3 days/week for single factors, progressing to daily for complex risk profiles.</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <Clock className="w-5 h-5 text-muted-foreground" />
+                            <div>
+                              <p className="font-semibold">Daily Risk Summary – {displayedStudents.filter(s => s.riskLevel === 'High').length} High Risk, {displayedStudents.filter(s => s.riskLevel === 'Medium').length} Medium Risk</p>
+                              <p className="text-xs text-muted-foreground">Delivered at 8:00 PM</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </TooltipProvider>
               </CardContent>
               <CardFooter>
                 <Button type="submit">Save Notification Settings</Button>
@@ -362,57 +427,57 @@ export default function AdminSettingsPage() {
             </Card>
           </form>
         </Form>
-        
+
         <div className="grid md:grid-cols-2 gap-6">
-           <Card>
-              <CardHeader>
-                <CardTitle>Data Management</CardTitle>
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Management</CardTitle>
+              <CardDescription>
+                Export reports or manage local application data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label>Standard Exports</Label>
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={handleExportAll}
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Export All Students (CSV)
+                </Button>
+                <Button
+                  className="w-full justify-start"
+                  variant="outline"
+                  onClick={handleExportHighRisk}
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Export High-Risk Students (CSV)
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  For context-aware exports (e.g., by batch or class), use the
+                  Analytics page.
+                </p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <Label>Cache Management</Label>
                 <CardDescription>
-                  Export reports or manage local application data.
+                  Clearing the cache will remove all stored student data from
+                  your browser and reset to initial demo data.
                 </CardDescription>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <Label>Standard Exports</Label>
-                  <Button
-                    className="w-full justify-start"
-                    variant="outline"
-                    onClick={handleExportAll}
-                  >
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Export All Students (CSV)
-                  </Button>
-                  <Button
-                    className="w-full justify-start"
-                    variant="outline"
-                    onClick={handleExportHighRisk}
-                  >
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Export High-Risk Students (CSV)
-                  </Button>
-                  <p className="text-sm text-muted-foreground">
-                    For context-aware exports (e.g., by batch or class), use the
-                    Analytics page.
-                  </p>
-                </div>
-                <Separator />
-                <div className="space-y-2">
-                  <Label>Cache Management</Label>
-                  <CardDescription>
-                    Clearing the cache will remove all stored student data from
-                    your browser and reset to initial demo data.
-                  </CardDescription>
-                  <Button
-                    variant="destructive"
-                    className="w-full"
-                    onClick={handleClearCache}
-                  >
-                    Clear Local Cache
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-            <RecentActivity />
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={handleClearCache}
+                >
+                  Clear Local Cache
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          <RecentActivity />
         </div>
 
         <Card>
@@ -424,74 +489,74 @@ export default function AdminSettingsPage() {
           </CardHeader>
           <CardContent>
             <div>
-                 <Label>Theme</Label>
-                <RadioGroup
-                  value={theme}
-                  onValueChange={(newTheme) => setTheme(newTheme as "light" | "dark" | "system")}
-                  className="grid max-w-md grid-cols-3 gap-8 pt-2"
-                >
-                  <FormItem>
-                    <Label className="[&:has([data-state=checked])>div]:border-primary">
-                      <RadioGroupItem value="light" className="sr-only" />
-                      <div className="items-center rounded-md border-2 border-muted p-1 hover:border-accent">
-                        <div className="space-y-2 rounded-sm bg-[#ecedf0] p-2">
-                          <div className="space-y-2 rounded-md bg-white p-2 shadow-sm">
-                            <div className="h-2 w-[80px] rounded-lg bg-[#ecedf0]" />
-                            <div className="h-2 w-[100px] rounded-lg bg-[#ecedf0]" />
-                          </div>
-                          <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm">
-                            <div className="h-4 w-4 rounded-full bg-[#ecedf0]" />
-                            <div className="h-2 w-[100px] rounded-lg bg-[#ecedf0]" />
-                          </div>
-                          <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm">
-                            <div className="h-4 w-4 rounded-full bg-[#ecedf0]" />
-                            <div className="h-2 w-[100px] rounded-lg bg-[#ecedf0]" />
-                          </div>
+              <Label>Theme</Label>
+              <RadioGroup
+                value={theme}
+                onValueChange={(newTheme) => setTheme(newTheme as "light" | "dark" | "system")}
+                className="grid max-w-md grid-cols-3 gap-8 pt-2"
+              >
+                <FormItem>
+                  <Label className="[&:has([data-state=checked])>div]:border-primary">
+                    <RadioGroupItem value="light" className="sr-only" />
+                    <div className="items-center rounded-md border-2 border-muted p-1 hover:border-accent">
+                      <div className="space-y-2 rounded-sm bg-[#ecedf0] p-2">
+                        <div className="space-y-2 rounded-md bg-white p-2 shadow-sm">
+                          <div className="h-2 w-[80px] rounded-lg bg-[#ecedf0]" />
+                          <div className="h-2 w-[100px] rounded-lg bg-[#ecedf0]" />
+                        </div>
+                        <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm">
+                          <div className="h-4 w-4 rounded-full bg-[#ecedf0]" />
+                          <div className="h-2 w-[100px] rounded-lg bg-[#ecedf0]" />
+                        </div>
+                        <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm">
+                          <div className="h-4 w-4 rounded-full bg-[#ecedf0]" />
+                          <div className="h-2 w-[100px] rounded-lg bg-[#ecedf0]" />
                         </div>
                       </div>
-                      <span className="block w-full p-2 text-center font-normal">
-                        Light
-                      </span>
-                    </Label>
-                  </FormItem>
-                  <FormItem>
-                    <Label className="[&:has([data-state=checked])>div]:border-primary">
-                      <RadioGroupItem value="dark" className="sr-only" />
-                      <div className="items-center rounded-md border-2 border-muted bg-popover p-1 hover:border-accent">
-                        <div className="space-y-2 rounded-sm bg-slate-950 p-2">
-                          <div className="space-y-2 rounded-md bg-slate-800 p-2 shadow-sm">
-                            <div className="h-2 w-[80px] rounded-lg bg-slate-400" />
-                            <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
-                          </div>
-                          <div className="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm">
-                            <div className="h-4 w-4 rounded-full bg-slate-400" />
-                            <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
-                          </div>
-                          <div className="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm">
-                            <div className="h-4 w-4 rounded-full bg-slate-400" />
-                            <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
-                          </div>
+                    </div>
+                    <span className="block w-full p-2 text-center font-normal">
+                      Light
+                    </span>
+                  </Label>
+                </FormItem>
+                <FormItem>
+                  <Label className="[&:has([data-state=checked])>div]:border-primary">
+                    <RadioGroupItem value="dark" className="sr-only" />
+                    <div className="items-center rounded-md border-2 border-muted bg-popover p-1 hover:border-accent">
+                      <div className="space-y-2 rounded-sm bg-slate-950 p-2">
+                        <div className="space-y-2 rounded-md bg-slate-800 p-2 shadow-sm">
+                          <div className="h-2 w-[80px] rounded-lg bg-slate-400" />
+                          <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
+                        </div>
+                        <div className="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm">
+                          <div className="h-4 w-4 rounded-full bg-slate-400" />
+                          <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
+                        </div>
+                        <div className="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm">
+                          <div className="h-4 w-4 rounded-full bg-slate-400" />
+                          <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
                         </div>
                       </div>
-                      <span className="block w-full p-2 text-center font-normal">
-                        Dark
-                      </span>
-                    </Label>
-                  </FormItem>
-                  <FormItem>
-                    <Label className="[&:has([data-state=checked])>div]:border-primary">
-                      <RadioGroupItem value="system" className="sr-only" />
-                      <div className="items-center rounded-md border-2 border-muted p-1 hover:border-accent">
-                        <div className="flex h-[116px] items-center justify-center rounded-lg bg-muted-foreground/10 p-6">
-                          <Settings className="h-8 w-8 text-muted-foreground" />
-                        </div>
+                    </div>
+                    <span className="block w-full p-2 text-center font-normal">
+                      Dark
+                    </span>
+                  </Label>
+                </FormItem>
+                <FormItem>
+                  <Label className="[&:has([data-state=checked])>div]:border-primary">
+                    <RadioGroupItem value="system" className="sr-only" />
+                    <div className="items-center rounded-md border-2 border-muted p-1 hover:border-accent">
+                      <div className="flex h-[116px] items-center justify-center rounded-lg bg-muted-foreground/10 p-6">
+                        <Settings className="h-8 w-8 text-muted-foreground" />
                       </div>
-                      <span className="block w-full p-2 text-center font-normal">
-                        System
-                      </span>
-                    </Label>
-                  </FormItem>
-                </RadioGroup>
+                    </div>
+                    <span className="block w-full p-2 text-center font-normal">
+                      System
+                    </span>
+                  </Label>
+                </FormItem>
+              </RadioGroup>
             </div>
           </CardContent>
         </Card>

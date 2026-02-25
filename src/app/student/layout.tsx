@@ -21,17 +21,17 @@ export default function StudentLayout({
       if (!user) {
         router.replace('/login');
       } else if (userProfile?.role === 'admin') {
-         router.replace('/admin/dashboard');
+        router.replace('/admin/dashboard');
       }
     }
   }, [user, userProfile, isLoading, router]);
-  
-  const student = students.find(s => s.email === user?.email);
+
+  const student = students.find(s => s.authUid === user?.uid || s.id === user?.uid);
   let alertCount = 0;
   if (student) {
-      if (student.riskLevel === 'High') alertCount++;
-      if (student.pendingAssignments > 2) alertCount++;
-      if (student.attendancePercentage < 80) alertCount++;
+    if (student.riskLevel === 'High') alertCount++;
+    if (student.pendingAssignments > 2) alertCount++;
+    if (student.attendancePercentage < 80) alertCount++;
   }
 
 
@@ -42,6 +42,6 @@ export default function StudentLayout({
       </div>
     );
   }
-  
+
   return <DashboardLayout role="student" alertCount={alertCount}>{children}</DashboardLayout>;
 }

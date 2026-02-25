@@ -1,9 +1,10 @@
 import { config } from 'dotenv';
 config({ path: '.env' });
 
-import '@/ai/flows/summarize-student-performance.ts';
-import '@/ai/flows/generate-personalized-recommendations.ts';
-import '@/ai/flows/predict-student-risk-level.ts';
-import '@/ai/flows/run-student-analysis.ts';
-import '@/ai/flows/generate-study-plan.ts';
-import '@/ai/flows/generate-student-report.ts';
+// Import all flows to register them
+import '@/ai/flows/summarize-student-performance';
+import '@/ai/flows/generate-personalized-recommendations';
+import '@/ai/flows/predict-student-risk-level';
+import '@/ai/flows/run-student-analysis';
+import '@/ai/flows/generate-study-plan';
+import '@/ai/flows/generate-student-report';

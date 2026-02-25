@@ -1,15 +1,15 @@
 'use client';
 
-import { 
-    createContext, 
-    useContext, 
-    useState, 
-    useEffect, 
-    useCallback, 
-    ReactNode 
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode
 } from "react";
-
-const STORAGE_KEY = "gradex-settings";
+import { useFirestore } from "@/firebase";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
 export interface ModelParameters {
   highRiskThreshold: number;
@@ -29,46 +29,47 @@ const defaultModelParameters: ModelParameters = {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
+  const firestore = useFirestore();
   const [modelParameters, setModelParametersState] = useState<ModelParameters>(defaultModelParameters);
-  const [isClient, setIsClient] = useState(false);
 
+  // Real-time listener for settings in Firestore
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    if (!firestore) return;
 
-  useEffect(() => {
-    if (isClient) {
-      try {
-        const item = window.localStorage.getItem(STORAGE_KEY);
-        if (item) {
-            const storedParams = JSON.parse(item);
-            // A simple validation to ensure the loaded settings have the correct shape
-            if (storedParams.highRiskThreshold !== undefined && storedParams.lowRiskThreshold !== undefined) {
-               setModelParametersState(storedParams);
-            } else {
-               window.localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultModelParameters));
-            }
+    const docRef = doc(firestore, "settings", "modelParameters");
+    const unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.highRiskThreshold !== undefined && data.lowRiskThreshold !== undefined) {
+            setModelParametersState(data as ModelParameters);
+          }
         } else {
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultModelParameters));
+          // If document doesn't exist, create it with defaults
+          setDoc(docRef, defaultModelParameters).catch((error) => {
+            console.error("Error writing default settings to Firestore:", error);
+          });
         }
-      } catch (error) {
-        console.error("Error reading settings from localStorage.", error);
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultModelParameters));
+      },
+      (error) => {
+        console.error("Error listening to settings:", error);
       }
-    }
-  }, [isClient]);
+    );
 
-  const setModelParameters = useCallback((params: ModelParameters) => {
+    return () => unsubscribe();
+  }, [firestore]);
+
+  const setModelParameters = useCallback(async (params: ModelParameters) => {
     setModelParametersState(params);
-    if (isClient) {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(params));
-      } catch (error) {
-        console.error("Error writing settings to localStorage", error);
-      }
+    if (!firestore) return;
+    try {
+      await setDoc(doc(firestore, "settings", "modelParameters"), params);
+    } catch (error) {
+      console.error("Error writing settings to Firestore:", error);
     }
-  }, [isClient]);
-  
+  }, [firestore]);
+
   const value = {
     modelParameters,
     setModelParameters,
@@ -82,9 +83,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 }
 
 export function useSettings() {
-    const context = useContext(SettingsContext);
-    if (context === undefined) {
-        throw new Error('useSettings must be used within a SettingsProvider');
-    }
-    return context;
+  const context = useContext(SettingsContext);
+  if (context === undefined) {
+    throw new Error('useSettings must be used within a SettingsProvider');
+  }
+  return context;
 }

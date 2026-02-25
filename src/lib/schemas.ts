@@ -20,19 +20,19 @@ export const studentFormSchema = z.object({
       subjectName: z.string(),
       internalMark1: z.coerce.number().min(0, "Min 0").max(40, "Max 40").optional(),
       internalMark2: z.coerce.number().min(0, "Min 0").max(40, "Max 40").optional(),
-      totalAssignments: z.coerce.number().optional(),
-      completedAssignments: z.coerce.number().min(0, "Min 0").optional(),
+      totalAssignments: z.coerce.number().int("Must be a whole number").optional(),
+      completedAssignments: z.coerce.number().int("Must be a whole number").min(0, "Min 0").optional(),
       subjectAttendancePercentage: z.coerce.number().min(0, "Min 0").max(100, "Max 100").optional(),
     }).superRefine((data, ctx) => {
-        const completed = data.completedAssignments ?? 0;
-        const total = data.totalAssignments ?? 0;
-        if (completed > total) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: `Cannot exceed total assignments (${total})`,
-                path: ['completedAssignments'],
-            });
-        }
+      const completed = data.completedAssignments ?? 0;
+      const total = data.totalAssignments ?? 0;
+      if (completed > total) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Cannot exceed total assignments (${total})`,
+          path: ['completedAssignments'],
+        });
+      }
     })
   ).min(1, "At least one subject must be selected for the academic group."),
 });

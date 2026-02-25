@@ -53,9 +53,9 @@ export default function SubjectPerformanceChart({ data, filters }: SubjectPerfor
       data.forEach(student => {
         student.subjects?.forEach(subject => {
           if (!isSpecificGroupSelected && !subjectDataMap.has(subject.subjectName)) {
-              subjectDataMap.set(subject.subjectName, { totalMark: 0, studentCount: 0 });
+            subjectDataMap.set(subject.subjectName, { totalMark: 0, studentCount: 0 });
           }
-          
+
           if (subjectDataMap.has(subject.subjectName)) {
             const current = subjectDataMap.get(subject.subjectName)!;
             const avgMark = ((subject.internalMark1 || 0) + (subject.internalMark2 || 0)) / 2;
@@ -66,11 +66,20 @@ export default function SubjectPerformanceChart({ data, filters }: SubjectPerfor
       });
 
       return Array.from(subjectDataMap.entries())
-        .map(([name, { totalMark, studentCount }]) => ({
-          name,
-          averageMark: studentCount > 0 ? totalMark / studentCount : 0,
-          hasData: studentCount > 0,
-        }))
+        .map(([name, { totalMark, studentCount }]) => {
+          // Create an abbreviation for the XAxis to prevent cutoff
+          const words = name.split(' ');
+          const abbreviation = words.length > 1 && name.length > 15
+            ? words.map(w => w[0]).join('').toUpperCase()
+            : name;
+
+          return {
+            name,
+            abbreviation,
+            averageMark: studentCount > 0 ? totalMark / studentCount : 0,
+            hasData: studentCount > 0,
+          };
+        })
         .filter(item => item.hasData);
     }
   }, [data, filters, getSubjectsForGroup]);
@@ -83,45 +92,45 @@ export default function SubjectPerformanceChart({ data, filters }: SubjectPerfor
   };
 
   const isSubjectView = filters.subject !== 'all';
-  
+
   if (chartData.length === 0) {
     return (
-        <div className="flex justify-center items-center h-[400px] w-full text-muted-foreground">
-            No subject data available for the current filter.
-        </div>
+      <div className="flex justify-center items-center h-[400px] w-full text-muted-foreground">
+        No subject data available for the current filter.
+      </div>
     )
   }
 
   return (
     <ChartContainer config={chartConfig} className="w-full h-[400px]">
       <ResponsiveContainer>
-        <BarChart 
-            data={chartData}
-            layout={isSubjectView ? 'vertical' : 'horizontal'}
-            margin={{
-                top: 20,
-                right: 30,
-                left: isSubjectView ? 40 : 20, // More left margin for student names
-                bottom: 5,
-            }}
+        <BarChart
+          data={chartData}
+          layout={isSubjectView ? 'vertical' : 'horizontal'}
+          margin={{
+            top: 20,
+            right: 30,
+            left: isSubjectView ? 40 : 20, // More left margin for student names
+            bottom: 5,
+          }}
         >
           <CartesianGrid strokeDasharray="3 3" />
           {isSubjectView ? (
             <>
               <XAxis type="number" domain={[0, 40]} />
-              <YAxis 
+              <YAxis
                 type="category"
-                dataKey="name" 
-                tickLine={false} 
-                axisLine={false} 
-                tickMargin={10} 
+                dataKey="name"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={10}
                 width={120}
               />
             </>
           ) : (
-             <>
+            <>
               <XAxis
-                dataKey="name"
+                dataKey="abbreviation"
                 tickLine={false}
                 tickMargin={10}
                 axisLine={false}
@@ -130,9 +139,26 @@ export default function SubjectPerformanceChart({ data, filters }: SubjectPerfor
             </>
           )}
 
-          <Tooltip 
-             cursor={{ fill: "hsl(var(--muted))" }}
-             content={<ChartTooltipContent />} 
+          <Tooltip
+            cursor={{ fill: "hsl(var(--muted))" }}
+            content={(props) => {
+              // Render the raw properties carefully, falling back to standard if needed
+              return (
+                <ChartTooltipContent
+                  {...props}
+                  hideLabel={false}
+                  labelFormatter={(label, payload) => {
+                    // The payload contains the full 'name' and 'abbreviation'
+                    // ChartTooltipContent uses `label`, which is the abbreviation here. 
+                    // Let's grab the full name from the payload so it shows in the tooltip header.
+                    if (payload && payload.length > 0 && payload[0].payload) {
+                      return payload[0].payload.name;
+                    }
+                    return label;
+                  }}
+                />
+              )
+            }}
           />
           <Legend />
           <Bar dataKey="averageMark" fill="var(--color-averageMark)" radius={4} />
@@ -142,4 +168,3 @@ export default function SubjectPerformanceChart({ data, filters }: SubjectPerfor
   );
 }
 
-    

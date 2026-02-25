@@ -14,6 +14,16 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { AddStudentDialog } from '../dashboard/components/add-student-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useStudentData } from '@/context/student-data-provider';
 import { useToast } from '@/hooks/use-toast';
 import type { Student } from '@/lib/data';
@@ -50,6 +60,8 @@ const groupStudents = (students: Student[]) => {
 export default function StudentsPage() {
   const { students, addStudent, updateStudent, deleteStudent, analyzingStudentId, setAnalyzingStudentId } =
     useStudentData();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const studentToDelete = deleteTarget ? students.find(s => s.id === deleteTarget) : null;
   const { modelParameters } = useSettings();
   const { toast } = useToast();
   const { getSubjectsForGroup } = useAcademicStructure();
@@ -137,17 +149,17 @@ export default function StudentsPage() {
       }
 
       const result = await response.json();
-      
+
       if (result.riskLevel !== student.riskLevel) {
-          logActivity(
-              "AI_ANALYSIS",
-              `AI analysis for '${student.name}' changed risk: ${student.riskLevel} -> ${result.riskLevel}.`
-          );
+        logActivity(
+          "AI_ANALYSIS",
+          `AI analysis for '${student.name}' changed risk: ${student.riskLevel} -> ${result.riskLevel}.`
+        );
       } else {
-            logActivity(
-                "AI_ANALYSIS",
-                `AI analysis run for '${student.name}'. Risk level remained '${student.riskLevel}'.`
-            );
+        logActivity(
+          "AI_ANALYSIS",
+          `AI analysis run for '${student.name}'. Risk level remained '${student.riskLevel}'.`
+        );
       }
 
       if (result) {
@@ -182,7 +194,7 @@ export default function StudentsPage() {
    * Firebase Authentication user with the student's email and a default password.
    * @param {StudentFormValues} data - The validated data from the "Add Student" form.
    */
-  const handleAddStudent = (data: StudentFormValues) => {
+  const handleAddStudent = async (data: StudentFormValues) => {
     // Step 1: Prevent duplicates by checking if the roll number already exists.
     if (students.some((student) => student.id === data.rollNumber)) {
       toast({
@@ -194,29 +206,29 @@ export default function StudentsPage() {
     }
 
     const { rollNumber, ...studentData } = data;
-    
+
     // Step 2: Calculate derived academic and assignment metrics.
     const standardSubjects = getSubjectsForGroup(studentData.batch, studentData.class, studentData.semester);
 
     const subjectsWithTotals = (studentData.subjects || []).map(formSubject => {
-        const standardSubject = standardSubjects.find(s => s.id === formSubject.subjectId);
-        return {
-            ...formSubject,
-            internalMark1: formSubject.internalMark1 ?? 0,
-            internalMark2: formSubject.internalMark2 ?? 0,
-            completedAssignments: formSubject.completedAssignments ?? 0,
-            totalAssignments: standardSubject?.totalAssignments ?? 5,
-            subjectAttendancePercentage: formSubject.subjectAttendancePercentage ?? 100,
-        };
+      const standardSubject = standardSubjects.find(s => s.id === formSubject.subjectId);
+      return {
+        ...formSubject,
+        internalMark1: formSubject.internalMark1 ?? 0,
+        internalMark2: formSubject.internalMark2 ?? 0,
+        completedAssignments: formSubject.completedAssignments ?? 0,
+        totalAssignments: standardSubject?.totalAssignments ?? 5,
+        subjectAttendancePercentage: formSubject.subjectAttendancePercentage ?? 100,
+      };
     });
 
     const totalMarksPossible = subjectsWithTotals.length * 80;
     const totalMarksObtained = subjectsWithTotals.reduce((acc, subj) => acc + (subj.internalMark1 ?? 0) + (subj.internalMark2 ?? 0), 0);
     const overallAverageMarkPercentage = totalMarksPossible > 0 ? (totalMarksObtained / totalMarksPossible) * 100 : 0;
-    
+
     const totalPossibleAssignments = subjectsWithTotals.reduce((acc, s) => acc + (s.totalAssignments ?? 0), 0);
     const totalCompletedAssignments = subjectsWithTotals.reduce((acc, s) => acc + (s.completedAssignments ?? 0), 0);
-    
+
     const assignmentCompletionPercentage =
       totalPossibleAssignments > 0
         ? (totalCompletedAssignments / totalPossibleAssignments) * 100
@@ -224,9 +236,9 @@ export default function StudentsPage() {
 
     const subjectAttendances = subjectsWithTotals.map(s => s.subjectAttendancePercentage);
     const averageAttendance = subjectAttendances.length > 0
-        ? subjectAttendances.reduce((acc, a) => acc + a, 0) / subjectAttendances.length
-        : 100;
-    
+      ? subjectAttendances.reduce((acc, a) => acc + a, 0) / subjectAttendances.length
+      : 100;
+
     // Step 3: Construct the new student object with initial placeholder data.
     const newStudent: Student = {
       name: studentData.name,
@@ -259,18 +271,30 @@ export default function StudentsPage() {
       subjectAnalyses: [],
       subjectRecommendations: [],
     };
-    
-    // Step 4: Persist the new student to the "database" (StudentDataProvider).
-    addStudent(newStudent);
-    logActivity("STUDENT_ADD", `New student '${data.name}' was added to '${data.class} - Sem ${data.semester}'.`);
 
+    try {
+      // Step 4: Persist the new student to the "database" (StudentDataProvider) and create Auth account.
+      const savedStudent = await addStudent(newStudent);
+      if (!savedStudent) throw new Error("Document ID not returned from Auth provider.");
+      logActivity("STUDENT_ADD", `New student '${data.name}' was added to '${data.class} - Sem ${data.semester}'.`);
 
-    // Step 5: Trigger the initial AI analysis for the newly created student.
-    runAnalysisForStudent(newStudent);
-    toast({
-      title: 'Student Added',
-      description: `${data.name} has been created. AI analysis is running.`,
-    });
+      // Step 5: Trigger the initial AI analysis for the newly created student.
+      // Use the fully saved student object that includes the authUid so we don't overwrite it later.
+      runAnalysisForStudent(savedStudent);
+      toast({
+        title: 'Student Added',
+        description: `${data.name} has been created. AI analysis is running.`,
+      });
+    } catch (error: any) {
+      console.error("Failed to add student:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to Add Student',
+        description: error.message?.includes('email-already-in-use')
+          ? 'This email address is already in use by another account.'
+          : 'An error occurred while creating the student account.',
+      });
+    }
   };
 
   const handleReRunAnalysis = (studentId: string) => {
@@ -281,14 +305,18 @@ export default function StudentsPage() {
   };
 
   const handleDeleteStudent = (studentId: string) => {
-    const student = students.find((s) => s.id === studentId);
-    if (student) {
-      logActivity("STUDENT_DELETE", `Deleted student record for '${student.name}' (${student.id}).`);
-      deleteStudent(studentId);
+    setDeleteTarget(studentId);
+  };
+
+  const confirmDelete = () => {
+    if (studentToDelete) {
+      logActivity("STUDENT_DELETE", `Deleted student record for '${studentToDelete.name}' (${studentToDelete.id}).`);
+      deleteStudent(studentToDelete.id);
       toast({
         title: 'Student Deleted',
-        description: `${student.name} has been removed from the system.`,
+        description: `${studentToDelete.name} has been removed from the system.`,
       });
+      setDeleteTarget(null);
     }
   };
 
@@ -320,49 +348,49 @@ export default function StudentsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-2 lg:col-span-1">
-                <Label htmlFor="search-filter">Search by Name or Roll No</Label>
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                        id="search-filter" 
-                        placeholder="e.g. Alex Johnson or ST001" 
-                        value={filters.search}
-                        onChange={(e) => handleFilterChange('search', e.target.value)}
-                        className="pl-10"
-                    />
-                </div>
+          <div className="space-y-2 lg:col-span-1">
+            <Label htmlFor="search-filter">Search by Name or Roll No</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search-filter"
+                placeholder="e.g. Alex Johnson or ST001"
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="pl-10"
+              />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="batch-filter">Batch</Label>
-              <Select value={filters.batch} onValueChange={(value) => handleFilterChange('batch', value)}>
-                <SelectTrigger id="batch-filter"><SelectValue placeholder="All Batches" /></SelectTrigger>
-                <SelectContent>
-                  {uniqueBatches.map((batch, index) => <SelectItem key={`${batch}-${index}`} value={batch}>{batch === 'all' ? 'All Batches' : batch}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-             <div className="space-y-2">
-              <Label htmlFor="class-filter">Class</Label>
-              <Select value={filters.class} onValueChange={(value) => handleFilterChange('class', value)}>
-                <SelectTrigger id="class-filter"><SelectValue placeholder="All Classes" /></SelectTrigger>
-                <SelectContent>
-                  {uniqueClasses.map((cls, index) => <SelectItem key={`${cls}-${index}`} value={cls}>{cls === 'all' ? 'All Classes' : cls}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-             <div className="space-y-2">
-              <Label htmlFor="semester-filter">Semester</Label>
-              <Select value={filters.semester} onValueChange={(value) => handleFilterChange('semester', value)}>
-                <SelectTrigger id="semester-filter"><SelectValue placeholder="All Semesters"/></SelectTrigger>
-                <SelectContent>
-                  {uniqueSemesters.map((sem, index) => <SelectItem key={`${sem}-${index}`} value={sem}>{sem === 'all' ? 'All Semesters' : sem}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="batch-filter">Batch</Label>
+            <Select value={filters.batch} onValueChange={(value) => handleFilterChange('batch', value)}>
+              <SelectTrigger id="batch-filter"><SelectValue placeholder="All Batches" /></SelectTrigger>
+              <SelectContent>
+                {uniqueBatches.map((batch, index) => <SelectItem key={`${batch}-${index}`} value={batch}>{batch === 'all' ? 'All Batches' : batch}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="class-filter">Class</Label>
+            <Select value={filters.class} onValueChange={(value) => handleFilterChange('class', value)}>
+              <SelectTrigger id="class-filter"><SelectValue placeholder="All Classes" /></SelectTrigger>
+              <SelectContent>
+                {uniqueClasses.map((cls, index) => <SelectItem key={`${cls}-${index}`} value={cls}>{cls === 'all' ? 'All Classes' : cls}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="semester-filter">Semester</Label>
+            <Select value={filters.semester} onValueChange={(value) => handleFilterChange('semester', value)}>
+              <SelectTrigger id="semester-filter"><SelectValue placeholder="All Semesters" /></SelectTrigger>
+              <SelectContent>
+                {uniqueSemesters.map((sem, index) => <SelectItem key={`${sem}-${index}`} value={sem}>{sem === 'all' ? 'All Semesters' : sem}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Student List</CardTitle>
@@ -382,15 +410,15 @@ export default function StudentsPage() {
                   {Object.entries(classes).map(([className, semesters]) => (
                     <Collapsible key={className} defaultOpen className="group/class border-l pl-2">
                       <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-4 py-2 text-md font-medium hover:bg-muted/80">
-                         <span>Class: {className}</span>
-                         <ChevronDown className="h-5 w-5 transition-transform data-[state=open]:rotate-180" />
+                        <span>Class: {className}</span>
+                        <ChevronDown className="h-5 w-5 transition-transform data-[state=open]:rotate-180" />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="space-y-2 py-2 pl-4">
                         {Object.entries(semesters).map(([semester, studentsInGroup]) => (
                           <Collapsible key={semester} defaultOpen className="group/semester">
-                             <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-4 py-1 text-sm font-semibold hover:bg-muted/50">
-                                <span>Semester: {semester}</span>
-                               <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-4 py-1 text-sm font-semibold hover:bg-muted/50">
+                              <span>Semester: {semester}</span>
+                              <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
                             </CollapsibleTrigger>
                             <CollapsibleContent className="pt-2">
                               <StudentTable
@@ -411,11 +439,40 @@ export default function StudentsPage() {
             ))
           ) : (
             <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/20">
-                <p className="text-muted-foreground">No students found for the selected criteria.</p>
+              <p className="text-muted-foreground">No students found for the selected criteria.</p>
             </div>
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              student record for {studentToDelete?.name ?? 'this student'}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault(); // Prevent default auto-close
+                // Close the dialog FIRST so its overlay fully unmounts
+                setDeleteTarget(null);
+                // Then trigger deletion after the overlay is removed from the DOM
+                setTimeout(() => {
+                  confirmDelete();
+                }, 200);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

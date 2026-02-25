@@ -15,12 +15,19 @@ export default function StudentDashboard() {
   const { user, isLoading: isUserLoading } = useUser();
   const { students } = useStudentData();
   const [student, setStudent] = useState<Student | null | undefined>(undefined);
-  
+
   useEffect(() => {
-      if (!isUserLoading && user) {
-          const currentStudent = students.find((s) => s.email === user.email);
-          setStudent(currentStudent || null);
+    if (!isUserLoading && user) {
+      if (students.length === 0) {
+        // If students array is empty, we must check if data is still loading from Firestore
+        // However, onSnapshot initializes with an empty array.
+        // To prevent infinite loading, we set student to null if it's not found in the list.
+        setStudent(null);
+      } else {
+        const currentStudent = students.find((s) => s.authUid === user.uid || s.id === user.uid);
+        setStudent(currentStudent || null);
       }
+    }
   }, [user, students, isUserLoading]);
 
   // Loading state
@@ -58,10 +65,10 @@ export default function StudentDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-            <Avatar className="h-14 w-14">
-                <AvatarImage src={profilePhoto?.imageUrl} alt={student.name} />
-                <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
-            </Avatar>
+          <Avatar className="h-14 w-14">
+            <AvatarImage src={profilePhoto?.imageUrl} alt={student.name} />
+            <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+          </Avatar>
         </div>
       </div>
       <div className="grid gap-4 md:gap-8 grid-cols-1 lg:grid-cols-2">

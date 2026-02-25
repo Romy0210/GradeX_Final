@@ -28,7 +28,7 @@ export default function BulkUploadPage() {
     const { students, addStudents } = useStudentData();
     const { getSubjectsForGroup } = useAcademicStructure();
     const { logActivity } = useActivityLog();
-    
+
     const [batch, setBatch] = useState('');
     const [className, setClassName] = useState('');
     const [semester, setSemester] = useState('');
@@ -55,7 +55,7 @@ export default function BulkUploadPage() {
             setStudentsToUpload([]);
         }
     };
-    
+
     const parseCSV = (csvText: string): Promise<any[]> => {
         return new Promise((resolve, reject) => {
             const lines = csvText.trim().split('\n');
@@ -65,7 +65,7 @@ export default function BulkUploadPage() {
             if (missingHeaders.length > 0) {
                 return reject(new Error(`CSV is missing required headers: ${missingHeaders.join(', ')}`));
             }
-            
+
             const data: any[] = [];
             for (let i = 1; i < lines.length; i++) {
                 if (!lines[i]) continue;
@@ -90,7 +90,7 @@ export default function BulkUploadPage() {
 
             const existingRollNumbers = new Set(students.map(s => s.id));
             const newRollNumbersInFile = new Set<string>();
-            
+
             const duplicates: string[] = [];
             let malformedCount = 0;
 
@@ -98,13 +98,13 @@ export default function BulkUploadPage() {
 
             // First pass: filter out malformed rows
             const wellFormedStudents = parsedData.filter(student => {
-                const isWellFormed = 
+                const isWellFormed =
                     student.rollNumber &&
                     student.fullName &&
                     student.email && emailRegex.test(student.email) &&
                     student.gender && ['Male', 'Female'].includes(student.gender) &&
                     student.age && !isNaN(parseInt(student.age, 10));
-                
+
                 if (!isWellFormed) {
                     malformedCount++;
                 }
@@ -124,12 +124,12 @@ export default function BulkUploadPage() {
                 }
                 return true;
             });
-            
+
             const uniqueDuplicates = [...new Set(duplicates)];
-            
+
             setValidationResult({ duplicates: uniqueDuplicates, malformed: malformedCount });
             setStudentsToUpload(studentsToProcess);
-            
+
             if (uniqueDuplicates.length > 0 || malformedCount > 0) {
                 setIsUploading(false); // Stop here and show confirmation dialog
             } else {
@@ -146,7 +146,7 @@ export default function BulkUploadPage() {
             setIsUploading(false);
         }
     };
-    
+
     /**
      * This function now creates student records with assigned subjects but empty academic data.
      * The analysis part is removed and will be triggered later after manual data entry.
@@ -197,8 +197,8 @@ export default function BulkUploadPage() {
                     batch: batch,
                     class: className,
                     semester: semester,
-                    profilePhoto: `student-${(students.length + index % 5) + 1}`,
-                    
+                    profilePhoto: `student-${(index % 5) + 1}`,
+
                     // Initialize academic data as empty/default
                     gpa: 0,
                     subjects: newSubjects,
@@ -211,7 +211,7 @@ export default function BulkUploadPage() {
                     // Set initial "Not Calculated" AI prediction values.
                     riskLevel: 'Medium', // Default placeholder
                     outcome: 'Pass', // Default placeholder
-                    gradeCategory: 'N/A',
+                    gradeCategory: 'C',
                     academicRecommendations: '',
                     behavioralRecommendations: '',
                     interventionRecommendations: '',
@@ -221,8 +221,8 @@ export default function BulkUploadPage() {
             });
 
             // Add new students to the "database"
-            addStudents(finalStudents);
-            
+            await addStudents(finalStudents);
+
             logActivity(
                 "BULK_UPLOAD",
                 `Bulk upload of ${finalStudents.length} students to ${batch} - ${className} - Sem ${semester}.`
@@ -249,99 +249,99 @@ export default function BulkUploadPage() {
     const isFormValid = batch && className && semester && file;
 
     return (
-    <>
-       <div className="flex items-center justify-between mb-4">
-        <nav className="flex items-center text-sm text-muted-foreground">
-            <Link href="/admin/students" className="hover:text-foreground">Students</Link>
-            <ChevronRight className="h-4 w-4 mx-1" />
-            <span className="font-medium text-foreground">Bulk Upload</span>
-        </nav>
-      </div>
-        <Card className="max-w-3xl mx-auto">
-            <CardHeader className="flex flex-row items-start justify-between">
-                <div>
-                    <CardTitle>Bulk Student Upload</CardTitle>
-                    <CardDescription>Upload a CSV file with student identity data for a specific academic group. Academic performance data must be added later.</CardDescription>
-                </div>
-                <CreateAcademicGroupDialog />
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="grid md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="batch">Batch (e.g., 2023-2027)</Label>
-                        <Input id="batch" value={batch} onChange={e => setBatch(e.target.value)} placeholder="2023-2027" />
+        <>
+            <div className="flex items-center justify-between mb-4">
+                <nav className="flex items-center text-sm text-muted-foreground">
+                    <Link href="/admin/students" className="hover:text-foreground">Students</Link>
+                    <ChevronRight className="h-4 w-4 mx-1" />
+                    <span className="font-medium text-foreground">Bulk Upload</span>
+                </nav>
+            </div>
+            <Card className="max-w-3xl mx-auto">
+                <CardHeader className="flex flex-row items-start justify-between">
+                    <div>
+                        <CardTitle>Bulk Student Upload</CardTitle>
+                        <CardDescription>Upload a CSV file with student identity data for a specific academic group. Academic performance data must be added later.</CardDescription>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="class">Class / Department</Label>
-                        <Input id="class" value={className} onChange={e => setClassName(e.target.value)} placeholder="Computer Science" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="semester">Semester</Label>
-                        <Input id="semester" value={semester} onChange={e => setSemester(e.target.value)} placeholder="6" />
-                    </div>
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="file-upload">Student Identity File (CSV)</Label>
-                    <div 
-                        className="flex items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary"
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        <div className="text-center">
-                            <Upload className="mx-auto h-10 w-10 text-muted-foreground"/>
-                            <p className="mt-2 text-sm text-muted-foreground">{file ? file.name : 'Click to select a CSV file'}</p>
-                            <p className="mt-1 text-xs text-muted-foreground/80">Required columns: {REQUIRED_HEADERS.join(', ')}</p>
+                    <CreateAcademicGroupDialog />
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="batch">Batch (e.g., 2023-2027)</Label>
+                            <Input id="batch" value={batch} onChange={e => setBatch(e.target.value)} placeholder="2023-2027" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="class">Class / Department</Label>
+                            <Input id="class" value={className} onChange={e => setClassName(e.target.value)} placeholder="Computer Science" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="semester">Semester</Label>
+                            <Input id="semester" value={semester} onChange={e => setSemester(e.target.value)} placeholder="6" />
                         </div>
                     </div>
-                    <Input id="file-upload" type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                 </div>
-            </CardContent>
-            <CardFooter className="flex-col items-stretch gap-4">
-                <Button onClick={handleValidation} disabled={!isFormValid || isUploading}>
-                    {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ListChecks className="mr-2 h-4 w-4" />}
-                    {isUploading ? 'Processing...' : 'Validate & Upload'}
-                </Button>
-                {validationResult && !isUploading && (
-                    <Alert variant={validationResult.duplicates.length > 0 || validationResult.malformed > 0 ? "destructive" : "default"}>
-                        <div className="flex items-start gap-3">
-                           {validationResult.duplicates.length > 0 || validationResult.malformed > 0 ? <AlertTriangle className="h-5 w-5 mt-0.5" /> : <CheckCircle className="h-5 w-5 mt-0.5" />}
-                            <div className="flex-1">
-                                <AlertTitle>Validation Complete</AlertTitle>
-                                <AlertDescription>
-                                    {validationResult.duplicates.length === 0 && validationResult.malformed === 0 
-                                    ? "No issues found. Upload will proceed."
-                                    : `Found ${validationResult.duplicates.length} duplicate roll numbers and ${validationResult.malformed} malformed rows.`
-                                    }
-                                </AlertDescription>
+                    <div className="space-y-2">
+                        <Label htmlFor="file-upload">Student Identity File (CSV)</Label>
+                        <div
+                            className="flex items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary"
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <div className="text-center">
+                                <Upload className="mx-auto h-10 w-10 text-muted-foreground" />
+                                <p className="mt-2 text-sm text-muted-foreground">{file ? file.name : 'Click to select a CSV file'}</p>
+                                <p className="mt-1 text-xs text-muted-foreground/80">Required columns: {REQUIRED_HEADERS.join(', ')}</p>
                             </div>
                         </div>
-                    </Alert>
-                )}
-            </CardFooter>
-        </Card>
-        
-        <AlertDialog open={validationResult != null && (validationResult.duplicates.length > 0 || validationResult.malformed > 0) && !isUploading}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Validation Issues Found</AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                      <div>
-                        <div>The uploaded file contains {validationResult?.duplicates.length} duplicate roll numbers and {validationResult?.malformed} malformed rows.</div>
-                        <div className="mt-2">Would you like to skip these records and upload the remaining {studentsToUpload.length} valid students?</div>
-                        {validationResult && validationResult.duplicates.length > 0 && (
-                            <div className="mt-4 text-xs">
-                                <p className="font-bold">Duplicate Roll Numbers:</p>
-                                <div className="text-muted-foreground break-all">{validationResult.duplicates.join(', ')}</div>
+                        <Input id="file-upload" type="file" accept=".csv" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                    </div>
+                </CardContent>
+                <CardFooter className="flex-col items-stretch gap-4">
+                    <Button onClick={handleValidation} disabled={!isFormValid || isUploading}>
+                        {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ListChecks className="mr-2 h-4 w-4" />}
+                        {isUploading ? 'Processing...' : 'Validate & Upload'}
+                    </Button>
+                    {validationResult && !isUploading && (
+                        <Alert variant={validationResult.duplicates.length > 0 || validationResult.malformed > 0 ? "destructive" : "default"}>
+                            <div className="flex items-start gap-3">
+                                {validationResult.duplicates.length > 0 || validationResult.malformed > 0 ? <AlertTriangle className="h-5 w-5 mt-0.5" /> : <CheckCircle className="h-5 w-5 mt-0.5" />}
+                                <div className="flex-1">
+                                    <AlertTitle>Validation Complete</AlertTitle>
+                                    <AlertDescription>
+                                        {validationResult.duplicates.length === 0 && validationResult.malformed === 0
+                                            ? "No issues found. Upload will proceed."
+                                            : `Found ${validationResult.duplicates.length} duplicate roll numbers and ${validationResult.malformed} malformed rows.`
+                                        }
+                                    </AlertDescription>
+                                </div>
                             </div>
-                        )}
-                      </div>
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => { setValidationResult(null); setIsUploading(false); }}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => proceedWithUpload(studentsToUpload)}>Skip & Continue</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    </>
+                        </Alert>
+                    )}
+                </CardFooter>
+            </Card>
+
+            <AlertDialog open={validationResult != null && (validationResult.duplicates.length > 0 || validationResult.malformed > 0) && !isUploading}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Validation Issues Found</AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                            <div>
+                                <div>The uploaded file contains {validationResult?.duplicates.length} duplicate roll numbers and {validationResult?.malformed} malformed rows.</div>
+                                <div className="mt-2">Would you like to skip these records and upload the remaining {studentsToUpload.length} valid students?</div>
+                                {validationResult && validationResult.duplicates.length > 0 && (
+                                    <div className="mt-4 text-xs">
+                                        <p className="font-bold">Duplicate Roll Numbers:</p>
+                                        <div className="text-muted-foreground break-all">{validationResult.duplicates.join(', ')}</div>
+                                    </div>
+                                )}
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => { setValidationResult(null); setIsUploading(false); }}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => proceedWithUpload(studentsToUpload)}>Skip & Continue</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }

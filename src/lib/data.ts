@@ -52,6 +52,7 @@ export type Student = {
   interventionRecommendations?: string;
   subjectAnalyses?: StudentSubjectAnalysis[];
   subjectRecommendations?: StudentSubjectRecommendation[];
+  authUid?: string;
 };
 
 export const students: Student[] = [
@@ -70,8 +71,8 @@ export const students: Student[] = [
     semester: "6",
     gpa: 8.5,
     subjects: [
-        { subjectId: "CS601", subjectName: "Data Structures", internalMark1: 35, internalMark2: 38, totalAssignments: 5, completedAssignments: 5, subjectAttendancePercentage: 95 },
-        { subjectId: "CS602", subjectName: "Operating Systems", internalMark1: 32, internalMark2: 36, totalAssignments: 5, completedAssignments: 5, subjectAttendancePercentage: 98 }
+      { subjectId: "CS601", subjectName: "Data Structures", internalMark1: 35, internalMark2: 38, totalAssignments: 5, completedAssignments: 5, subjectAttendancePercentage: 95 },
+      { subjectId: "CS602", subjectName: "Operating Systems", internalMark1: 32, internalMark2: 36, totalAssignments: 5, completedAssignments: 5, subjectAttendancePercentage: 98 }
     ],
     overallAverageMarkPercentage: 91.25,
     attendancePercentage: 97,
@@ -103,8 +104,8 @@ export const students: Student[] = [
     semester: "6",
     gpa: 6.2,
     subjects: [
-        { subjectId: "CS601", subjectName: "Data Structures", internalMark1: 22, internalMark2: 25, totalAssignments: 5, completedAssignments: 2, subjectAttendancePercentage: 78 },
-        { subjectId: "CS602", subjectName: "Operating Systems", internalMark1: 20, internalMark2: 21, totalAssignments: 5, completedAssignments: 1, subjectAttendancePercentage: 70 }
+      { subjectId: "CS601", subjectName: "Data Structures", internalMark1: 22, internalMark2: 25, totalAssignments: 5, completedAssignments: 2, subjectAttendancePercentage: 78 },
+      { subjectId: "CS602", subjectName: "Operating Systems", internalMark1: 20, internalMark2: 21, totalAssignments: 5, completedAssignments: 1, subjectAttendancePercentage: 70 }
     ],
     overallAverageMarkPercentage: 58.75,
     attendancePercentage: 74,
@@ -136,8 +137,8 @@ export const students: Student[] = [
     semester: "4",
     gpa: 6.8,
     subjects: [
-        { subjectId: "IT401", subjectName: "Web Development", internalMark1: 25, internalMark2: 28, totalAssignments: 5, completedAssignments: 3, subjectAttendancePercentage: 82 },
-        { subjectId: "IT402", subjectName: "Software Engineering", internalMark1: 22, internalMark2: 30, totalAssignments: 4, completedAssignments: 2, subjectAttendancePercentage: 85 },
+      { subjectId: "IT401", subjectName: "Web Development", internalMark1: 25, internalMark2: 28, totalAssignments: 5, completedAssignments: 3, subjectAttendancePercentage: 82 },
+      { subjectId: "IT402", subjectName: "Software Engineering", internalMark1: 22, internalMark2: 30, totalAssignments: 4, completedAssignments: 2, subjectAttendancePercentage: 85 },
     ],
     overallAverageMarkPercentage: 66.25,
     attendancePercentage: 84,
@@ -169,8 +170,8 @@ export const students: Student[] = [
     semester: "4",
     gpa: 7.5,
     subjects: [
-        { subjectId: "IT401", subjectName: "Web Development", internalMark1: 28, internalMark2: 30, totalAssignments: 5, completedAssignments: 4, subjectAttendancePercentage: 91 },
-        { subjectId: "IT402", subjectName: "Software Engineering", internalMark1: 32, internalMark2: 31, totalAssignments: 4, completedAssignments: 4, subjectAttendancePercentage: 94 },
+      { subjectId: "IT401", subjectName: "Web Development", internalMark1: 28, internalMark2: 30, totalAssignments: 5, completedAssignments: 4, subjectAttendancePercentage: 91 },
+      { subjectId: "IT402", subjectName: "Software Engineering", internalMark1: 32, internalMark2: 31, totalAssignments: 4, completedAssignments: 4, subjectAttendancePercentage: 94 },
     ],
     overallAverageMarkPercentage: 72.5,
     attendancePercentage: 93,
@@ -202,8 +203,8 @@ export const students: Student[] = [
     semester: "6",
     gpa: 7.8,
     subjects: [
-        { subjectId: "CS601", subjectName: "Data Structures", internalMark1: 30, internalMark2: 32, totalAssignments: 5, completedAssignments: 4, subjectAttendancePercentage: 88 },
-        { subjectId: "CS602", subjectName: "Operating Systems", internalMark1: 28, internalMark2: 34, totalAssignments: 5, completedAssignments: 5, subjectAttendancePercentage: 90 },
+      { subjectId: "CS601", subjectName: "Data Structures", internalMark1: 30, internalMark2: 32, totalAssignments: 5, completedAssignments: 4, subjectAttendancePercentage: 88 },
+      { subjectId: "CS602", subjectName: "Operating Systems", internalMark1: 28, internalMark2: 34, totalAssignments: 5, completedAssignments: 5, subjectAttendancePercentage: 90 },
     ],
     overallAverageMarkPercentage: 77.5,
     attendancePercentage: 89,

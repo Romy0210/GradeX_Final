@@ -23,7 +23,7 @@ type AtRiskPreviewProps = {
 };
 
 export default function AtRiskPreview({ data }: AtRiskPreviewProps) {
-  const highRiskStudents = data.filter((s) => s.riskLevel === "High").slice(0, 5);
+  const highRiskStudents = data.filter((s) => s.riskLevel === "High" || (s.subjectAnalyses?.some(sub => sub.riskLevel === "High") ?? false)).slice(0, 5);
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(
     new Set()
   );

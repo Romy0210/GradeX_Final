@@ -35,7 +35,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { studentFormSchema, type StudentFormValues } from "@/lib/schemas";
 import { Separator } from "@/components/ui/separator";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Loader2 } from "lucide-react";
 
 type AddStudentDialogProps = {
   onFormSubmit: (data: StudentFormValues) => void;
@@ -69,7 +69,7 @@ export function AddStudentDialog({
     control: form.control,
     name: "subjects",
   });
-  
+
   const watchedBatch = form.watch("batch");
   const watchedClass = form.watch("class");
   const watchedSemester = form.watch("semester");
@@ -77,27 +77,34 @@ export function AddStudentDialog({
 
   useEffect(() => {
     if (watchedBatch && watchedClass && watchedSemester) {
-        const standardSubjects = getSubjectsForGroup(watchedBatch, watchedClass, watchedSemester);
-        const newSubjects = standardSubjects.map(sub => ({
-            subjectId: sub.id,
-            subjectName: sub.name,
-            internalMark1: 0,
-            internalMark2: 0,
-            totalAssignments: sub.totalAssignments ?? 5,
-            completedAssignments: 0,
-            subjectAttendancePercentage: 100,
-        }));
-        replace(newSubjects);
+      const standardSubjects = getSubjectsForGroup(watchedBatch, watchedClass, watchedSemester);
+      const newSubjects = standardSubjects.map(sub => ({
+        subjectId: sub.id,
+        subjectName: sub.name,
+        internalMark1: 0,
+        internalMark2: 0,
+        totalAssignments: sub.totalAssignments ?? 5,
+        completedAssignments: 0,
+        subjectAttendancePercentage: 100,
+      }));
+      replace(newSubjects);
     } else {
-        replace([]);
+      replace([]);
     }
   }, [watchedBatch, watchedClass, watchedSemester, getSubjectsForGroup, replace]);
 
 
-  const onSubmit = (data: StudentFormValues) => {
-    onFormSubmit(data);
-    setOpen(false);
-    form.reset();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const onSubmit = async (data: StudentFormValues) => {
+    setIsSubmitting(true);
+    try {
+      await onFormSubmit(data);
+      setOpen(false);
+      form.reset();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const uniqueBatches = [...new Set(configurations.map((c) => c.batch))];
@@ -173,8 +180,8 @@ export function AddStudentDialog({
                           <Input
                             type="number"
                             {...field}
-                            onChange={e => field.onChange(+e.target.value)}
-                            value={field.value ?? ""}
+                            onChange={e => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                            value={field.value ?? ''}
                           />
                         </FormControl>
                         <FormMessage />
@@ -237,169 +244,175 @@ export function AddStudentDialog({
                 />
 
                 <div className="grid grid-cols-3 gap-4">
-                   <FormField
+                  <FormField
                     control={form.control}
                     name="batch"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Batch</FormLabel>
-                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger></FormControl>
-                            <SelectContent>{uniqueBatches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger></FormControl>
+                          <SelectContent>{uniqueBatches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                   <FormField
+                  <FormField
                     control={form.control}
                     name="class"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Class/Dept</FormLabel>
-                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger></FormControl>
-                            <SelectContent>{uniqueClasses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger></FormControl>
+                          <SelectContent>{uniqueClasses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                   <FormField
+                  <FormField
                     control={form.control}
                     name="semester"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Semester</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select Semester" /></SelectTrigger></FormControl>
-                            <SelectContent>{uniqueSemesters.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select Semester" /></SelectTrigger></FormControl>
+                          <SelectContent>{uniqueSemesters.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="space-y-4">
                   <FormLabel>Subjects & Marks</FormLabel>
                   {fields.map((field, index) => {
-                     const totalAssignments = watchedSubjects?.[index]?.totalAssignments || 0;
-                     const completedAssignmentsValue = watchedSubjects?.[index]?.completedAssignments;
-                     const completedAssignments = typeof completedAssignmentsValue === 'number' && !isNaN(completedAssignmentsValue) ? completedAssignmentsValue : 0;
-                     const pendingAssignments = totalAssignments - completedAssignments;
+                    const totalAssignments = watchedSubjects?.[index]?.totalAssignments || 0;
+                    const completedAssignmentsValue = watchedSubjects?.[index]?.completedAssignments;
+                    const completedAssignments = typeof completedAssignmentsValue === 'number' && !isNaN(completedAssignmentsValue) ? completedAssignmentsValue : 0;
+                    const pendingAssignments = totalAssignments - completedAssignments;
 
-                     return (
-                     <div key={field.id} className="p-4 border rounded-lg space-y-4">
+                    return (
+                      <div key={field.id} className="p-4 border rounded-lg space-y-4">
                         <input
-                            type="hidden"
-                            {...form.register(`subjects.${index}.totalAssignments`)}
+                          type="hidden"
+                          {...form.register(`subjects.${index}.totalAssignments`)}
                         />
                         <FormField
-                            control={form.control}
-                            name={`subjects.${index}.subjectName`}
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Subject Name</FormLabel>
-                                <FormControl>
-                                    <Input {...field} disabled />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
+                          control={form.control}
+                          name={`subjects.${index}.subjectName`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Subject Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} disabled />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
                         <div className="grid grid-cols-2 gap-4">
-                           <FormField
+                          <FormField
                             control={form.control}
                             name={`subjects.${index}.internalMark1`}
                             render={({ field }) => (
-                                <FormItem>
+                              <FormItem>
                                 <FormLabel>Internal Mark 1 (40)</FormLabel>
                                 <FormControl>
-                                    <Input
-                                      type="number"
-                                      {...field}
-                                      onChange={(e) => field.onChange(+e.target.value)}
-                                      value={field.value ?? ""}
-                                    />
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    {...field}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                    value={field.value ?? ""}
+                                  />
                                 </FormControl>
                                 <FormMessage />
-                                </FormItem>
+                              </FormItem>
                             )}
-                            />
-                            <FormField
+                          />
+                          <FormField
                             control={form.control}
                             name={`subjects.${index}.internalMark2`}
                             render={({ field }) => (
-                                <FormItem>
+                              <FormItem>
                                 <FormLabel>Internal Mark 2 (40)</FormLabel>
                                 <FormControl>
-                                    <Input
-                                      type="number"
-                                      {...field}
-                                      onChange={(e) => field.onChange(+e.target.value)}
-                                      value={field.value ?? ""}
-                                    />
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    {...field}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                    value={field.value ?? ""}
+                                  />
                                 </FormControl>
                                 <FormMessage />
-                                </FormItem>
+                              </FormItem>
                             )}
-                           />
+                          />
                         </div>
                         <Separator className="my-2" />
                         <div className="grid grid-cols-2 gap-4 items-start">
-                            <FormField
-                                control={form.control}
-                                name={`subjects.${index}.completedAssignments`}
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Completed Assignments</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="number"
-                                            {...field}
-                                            onChange={(e) => field.onChange(+e.target.value)}
-                                            value={field.value ?? ""}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <div className="text-sm space-y-1 pt-8">
-                                <p>Total: <span className="font-semibold">{totalAssignments}</span></p>
-                                <p>Pending: <span className="font-semibold">{pendingAssignments < 0 ? 0 : pendingAssignments}</span></p>
-                            </div>
-                        </div>
-                         <FormField
+                          <FormField
                             control={form.control}
-                            name={`subjects.${index}.subjectAttendancePercentage`}
+                            name={`subjects.${index}.completedAssignments`}
                             render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Subject Attendance (%)</FormLabel>
+                              <FormItem>
+                                <FormLabel>Completed Assignments</FormLabel>
                                 <FormControl>
-                                    <Input
-                                        type="number"
-                                        {...field}
-                                        onChange={(e) => field.onChange(+e.target.value)}
-                                        value={field.value ?? ""}
-                                    />
+                                  <Input
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    {...field}
+                                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                                    value={field.value ?? ""}
+                                  />
                                 </FormControl>
                                 <FormMessage />
-                                </FormItem>
+                              </FormItem>
                             )}
+                          />
+                          <div className="text-sm space-y-1 pt-8">
+                            <p>Total: <span className="font-semibold">{totalAssignments}</span></p>
+                            <p>Pending: <span className="font-semibold">{pendingAssignments < 0 ? 0 : pendingAssignments}</span></p>
+                          </div>
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name={`subjects.${index}.subjectAttendancePercentage`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Subject Attendance (%)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.value)}
+                                  value={field.value ?? ""}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                     </div>
-                  )})}
+                      </div>
+                    )
+                  })}
                   {fields.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Select batch, class, and semester to load subjects.</p>
                   ) : null}
                   <FormMessage>{form.formState.errors.subjects?.root?.message}</FormMessage>
                 </div>
-                
-                 <Separator />
+
+                <Separator />
 
                 <div className="grid grid-cols-3 gap-4">
                   <FormField
@@ -409,13 +422,13 @@ export function AddStudentDialog({
                       <FormItem>
                         <FormLabel>GPA (out of 10)</FormLabel>
                         <FormControl>
-                           <Input
-                             type="number"
-                             step="0.1"
-                             {...field}
-                             onChange={(e) => field.onChange(+e.target.value)}
-                             value={field.value ?? ""}
-                           />
+                          <Input
+                            type="number"
+                            step="any"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            value={field.value ?? ''}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -433,7 +446,10 @@ export function AddStudentDialog({
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit">Add Student</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Add Student
+              </Button>
             </DialogFooter>
           </form>
         </Form>

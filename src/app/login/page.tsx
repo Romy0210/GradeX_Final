@@ -70,7 +70,7 @@ export default function LoginPage() {
         data.password
       );
       const user = userCredential.user;
-      
+
       // Step 2: Check for an existing user profile in Firestore.
       const userDocRef = doc(firestore, 'users', user.uid);
       const docSnap = await getDoc(userDocRef);
@@ -97,7 +97,7 @@ export default function LoginPage() {
           { merge: true }
         );
       }
-      
+
       // Step 4: Validate that the user is logging into the correct role-based portal.
       if (role !== userRole) {
         toast({
@@ -195,10 +195,28 @@ export default function LoginPage() {
         router.push('/student/dashboard');
       }
     } catch (error: any) {
+      let description = 'An unexpected error occurred. Please try again.';
+      switch (error?.code) {
+        case 'auth/unauthorized-domain':
+          description = 'This domain is not authorized for sign-in. Please contact the administrator.';
+          break;
+        case 'auth/popup-closed-by-user':
+          description = 'Sign-in popup was closed. Please try again.';
+          break;
+        case 'auth/popup-blocked':
+          description = 'Sign-in popup was blocked by the browser. Please allow popups and try again.';
+          break;
+        case 'auth/network-request-failed':
+          description = 'Network error. Please check your connection and try again.';
+          break;
+        case 'auth/cancelled-popup-request':
+          description = 'Only one sign-in popup can be open at a time.';
+          break;
+      }
       toast({
         variant: 'destructive',
         title: 'Google Sign-In Failed',
-        description: error.message,
+        description,
       });
     } finally {
       setIsGoogleLoading(false);
@@ -263,7 +281,7 @@ export default function LoginPage() {
             Login
           </Button>
         </form>
-        
+
         <div className="mt-4 text-center text-sm">
           Don&apos;t have an account?{' '}
           <Link href="/register" className="underline">

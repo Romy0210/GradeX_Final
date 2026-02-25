@@ -34,7 +34,7 @@ const formatValue = (value: any): string => {
 
 const createCSV = (headers: string[], data: any[], metadata: ExportMetadata): string => {
     const now = new Date();
-    
+
     // Create metadata header
     let csvContent = "";
     csvContent += `# GradeX Report\n`;
@@ -50,7 +50,7 @@ const createCSV = (headers: string[], data: any[], metadata: ExportMetadata): st
 
     // Create CSV content from an array of objects
     const headerRow = headers.map(formatValue).join(',');
-    const dataRows = data.map(row => 
+    const dataRows = data.map(row =>
         headers.map(header => formatValue(row[header as keyof typeof row])).join(',')
     );
 
@@ -58,15 +58,28 @@ const createCSV = (headers: string[], data: any[], metadata: ExportMetadata): st
 };
 
 const downloadCSV = (csvContent: string, fileName: string) => {
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", fileName);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+        // Construct the Blob safely without trailing semicolons in the MIME type
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none'; // Use display:none instead of visibility:hidden
+
+        document.body.appendChild(link);
+        link.click();
+
+        // Clean up the DOM and release the object URL memory after a short delay
+        // to ensure the browser has time to initiate the download
+        setTimeout(() => {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        }, 100);
+    } catch (e) {
+        console.error("Failed to execute CSV download:", e);
+    }
 };
 
 // Specific export functions
@@ -97,7 +110,7 @@ export const exportStandardReport = (students: Student[], metadata: ExportMetada
         if (hasSubjects) {
             student.subjects!.forEach(subject => {
                 const subjectAnalysis = student.subjectAnalyses?.find(sa => sa.subjectId === subject.subjectId);
-                
+
                 data.push({
                     'Batch': student.batch,
                     'Class / Department': student.class,
@@ -117,7 +130,7 @@ export const exportStandardReport = (students: Student[], metadata: ExportMetada
                 });
             });
         } else {
-             data.push({
+            data.push({
                 'Batch': student.batch,
                 'Class / Department': student.class,
                 'Semester': student.semester,
@@ -143,19 +156,19 @@ export const exportStandardReport = (students: Student[], metadata: ExportMetada
 
 
 const getRiskReason = (student: Student): string => {
-  const reasons = [];
-  if (student.gpa < 6.5) reasons.push('Low GPA');
-  if (student.attendancePercentage < 80) reasons.push('Low Attendance');
-  if (student.assignmentCompletionPercentage < 70) reasons.push('Low Assignment Completion');
-  if (student.pendingAssignments >= 3) reasons.push('High Pending Assignments');
-  if(reasons.length === 0) return "N/A";
-  return reasons.join('; ');
+    const reasons = [];
+    if (student.gpa < 6.5) reasons.push('Low GPA');
+    if (student.attendancePercentage < 80) reasons.push('Low Attendance');
+    if (student.assignmentCompletionPercentage < 70) reasons.push('Low Assignment Completion');
+    if (student.pendingAssignments >= 3) reasons.push('High Pending Assignments');
+    if (reasons.length === 0) return "N/A";
+    return reasons.join('; ');
 }
 
 
 export const exportHighRiskReport = (students: Student[], metadata: ExportMetadata, fileName: string) => {
     const headers = [
-        'id', 'name', 'batch', 'class', 'semester', 'gpa', 
+        'id', 'name', 'batch', 'class', 'semester', 'gpa',
         'attendancePercentage', 'pendingAssignments', 'riskReason'
     ];
     const displayHeaders = headers.map(h => h === 'id' ? 'rollNumber' : h);
@@ -173,7 +186,7 @@ export const exportHighRiskReport = (students: Student[], metadata: ExportMetada
         riskReason: getRiskReason(s)
     }));
 
-     const csvContent = createCSV(displayHeaders, data.map(row => {
+    const csvContent = createCSV(displayHeaders, data.map(row => {
         const newRow: Record<string, any> = {};
         Object.keys(row).forEach((key, i) => {
             newRow[displayHeaders[i]] = (row as any)[key];
@@ -202,8 +215,8 @@ export const exportAllStudentsReport = (students: Student[], metadata: ExportMet
             } else if (header === 'internalMark2') {
                 rowData['internalMark2'] = row.subjects?.map(sub => sub.internalMark2).join(';') ?? '';
             } else {
-                 const key = header as keyof Student;
-                 // Special handling for the key rename
+                const key = header as keyof Student;
+                // Special handling for the key rename
                 const displayKey = key === 'id' ? 'rollNumber' : key;
                 rowData[displayKey] = row[key] ?? "";
             }
@@ -217,10 +230,10 @@ export const exportAllStudentsReport = (students: Student[], metadata: ExportMet
 
 export const exportAttendanceReport = (data: MonitoredData[], metadata: ExportMetadata, fileName: string) => {
     const headers = [
-        'Roll Number', 'Student Name', 'Batch', 'Class', 'Semester', 'Subject', 
+        'Roll Number', 'Student Name', 'Batch', 'Class', 'Semester', 'Subject',
         'Attendance %', 'Risk Level', 'Total Sessions', 'Present', 'Absent'
     ];
-    
+
     const TOTAL_SESSIONS = 60;
     const getAttendanceRisk = (percentage: number): 'Low' | 'Medium' | 'High' => {
         if (percentage < 75) return 'High';

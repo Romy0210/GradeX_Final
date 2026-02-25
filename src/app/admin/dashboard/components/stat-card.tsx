@@ -27,11 +27,15 @@ export default function StatCard({
   progress,
 }: StatCardProps) {
   return (
-    <Card className="relative overflow-hidden bg-card">
-       <div className="absolute top-0 left-0 h-full w-full bg-gradient-to-br from-primary/10 to-background opacity-50"></div>
+    <Card className="relative overflow-hidden bg-card border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group">
+      <div className="absolute top-0 right-0 h-32 w-32 bg-gradient-to-br from-primary/5 to-transparent rounded-bl-full opacity-50 transition-opacity group-hover:opacity-100"></div>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        {icon && (
+          <div className="p-2.5 rounded-xl bg-primary/10 text-primary mt-[-4px]">
+            {icon}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="relative z-10">
         <div className="text-2xl font-bold">{value}</div>
@@ -41,13 +45,13 @@ export default function StatCard({
           )}
           {trendValue && (
             <div className={`flex items-center gap-1 ${trendDirection === 'down' ? 'text-red-500' : 'text-green-500'}`}>
-                {trendDirection === 'down' ? <ArrowDown className="h-3 w-3"/> : <ArrowUp className="h-3 w-3"/>}
-                <span>{trendValue}</span>
+              {trendDirection === 'down' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
+              <span>{trendValue}</span>
             </div>
           )}
         </div>
         {progress !== undefined && (
-            <Progress value={progress} className="mt-2 h-2" />
+          <Progress value={progress} className="mt-2 h-2" />
         )}
       </CardContent>
     </Card>

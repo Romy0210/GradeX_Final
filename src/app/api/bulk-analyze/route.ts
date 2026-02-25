@@ -9,7 +9,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function POST(request: Request) {
   try {
-    const { students: studentsToAnalyze, modelParameters }: { students: StudentAnalysisInput[], modelParameters?: { highRiskThreshold: number; lowRiskThreshold: number; } } = await request.json();
+    const { students: studentsToAnalyze, modelParameters }: { students: StudentAnalysisInput[], modelParameters?: { highRiskThreshold: number; mediumRiskThreshold: number; } } = await request.json();
 
     if (!studentsToAnalyze || !Array.isArray(studentsToAnalyze)) {
       return NextResponse.json({ error: 'Invalid input: students array is required.' }, { status: 400 });
@@ -17,24 +17,24 @@ export async function POST(request: Request) {
 
     const processedStudents = [];
     for (const student of studentsToAnalyze) {
-        const report = await generateStudentReport({
-            gpa: student.gpa,
-            attendancePercentage: student.attendancePercentage,
-            assignmentCompletionPercentage: student.assignmentCompletionPercentage,
-            pendingAssignments: student.pendingAssignments,
-            overallAverageMarkPercentage: student.overallAverageMarkPercentage,
-            highRiskThreshold: modelParameters?.highRiskThreshold,
-            lowRiskThreshold: modelParameters?.lowRiskThreshold,
-        });
-        processedStudents.push({
-            ...student,
-            ...report,
-        });
-        // Add a delay to respect API rate limits (e.g., 20 requests per minute for the free tier)
-        // 60 seconds / 20 requests = 3 seconds per request.
-        await delay(3000); 
+      const report = await generateStudentReport({
+        gpa: student.gpa,
+        attendancePercentage: student.attendancePercentage,
+        assignmentCompletionPercentage: student.assignmentCompletionPercentage,
+        pendingAssignments: student.pendingAssignments,
+        overallAverageMarkPercentage: student.overallAverageMarkPercentage,
+        highRiskThreshold: modelParameters?.highRiskThreshold,
+        mediumRiskThreshold: modelParameters?.mediumRiskThreshold,
+      });
+      processedStudents.push({
+        ...student,
+        ...report,
+      });
+      // Add a delay to respect API rate limits (e.g., 20 requests per minute for the free tier)
+      // 60 seconds / 20 requests = 3 seconds per request.
+      await delay(3000);
     }
-    
+
     return NextResponse.json({ students: processedStudents });
   } catch (error: any) {
     console.error('Error during bulk analysis:', error);

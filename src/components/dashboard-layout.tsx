@@ -81,10 +81,10 @@ export function DashboardLayout({ children, role, alertCount }: DashboardLayoutP
     await signOut(auth);
     router.push("/login");
   };
-  
+
   if (isLoading || !user) {
     return (
-       <div className="flex h-screen w-full items-center justify-center bg-background">
+      <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
@@ -101,18 +101,18 @@ export function DashboardLayout({ children, role, alertCount }: DashboardLayoutP
           </div>
         </SidebarHeader>
         <SidebarContent className="p-4 flex flex-col gap-4">
-           {user && userProfile && (
-            <div className="flex flex-col items-start gap-3 rounded-lg bg-sidebar-accent p-4">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={user.photoURL ?? undefined} />
-                  <AvatarFallback>{userProfile.displayName?.[0] || 'A'}</AvatarFallback>
-                </Avatar>
-                <div>
-                    <p className="text-md font-semibold">{userProfile.displayName || 'Admin'}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                </div>
+          {user && userProfile && (
+            <div className="flex flex-col items-start gap-3 rounded-lg bg-sidebar-accent p-4 w-full overflow-hidden">
+              <Avatar className="h-12 w-12 shrink-0">
+                <AvatarImage src={user.photoURL ?? undefined} />
+                <AvatarFallback>{userProfile.displayName?.[0] || 'A'}</AvatarFallback>
+              </Avatar>
+              <div className="w-full min-w-0">
+                <p className="text-md font-semibold truncate">{userProfile.displayName || 'Admin'}</p>
+                <p className="text-sm text-muted-foreground truncate" title={user.email || ""}>{user.email}</p>
+              </div>
             </div>
-           )}
+          )}
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.href}>
@@ -121,14 +121,18 @@ export function DashboardLayout({ children, role, alertCount }: DashboardLayoutP
                   isActive={pathname.startsWith(item.href)}
                   tooltip={{ children: item.label }}
                 >
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
+                  <Link href={item.href} className="flex flex-1 items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.href === "/student/ai-summary" && alertCount && alertCount > 0 ? (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-destructive px-1 text-xs font-medium text-destructive-foreground">
+                        {alertCount}
+                      </span>
+                    ) : null}
                   </Link>
                 </SidebarMenuButton>
-                 {item.href === "/student/ai-summary" && alertCount && alertCount > 0 && (
-                    <SidebarMenuBadge>{alertCount}</SidebarMenuBadge>
-                )}
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -137,14 +141,14 @@ export function DashboardLayout({ children, role, alertCount }: DashboardLayoutP
         <SidebarFooter className="p-4 mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton
+              <SidebarMenuButton
                 onClick={handleLogout}
                 tooltip={{ children: "Log Out" }}
                 className="text-destructive dark:text-destructive-foreground/70 hover:bg-destructive/20 dark:hover:text-destructive-foreground"
-                >
+              >
                 <LogOut />
                 <span>Log Out</span>
-                </SidebarMenuButton>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>

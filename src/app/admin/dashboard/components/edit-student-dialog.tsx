@@ -41,29 +41,38 @@ import { Separator } from "@/components/ui/separator";
 type EditStudentDialogProps = {
   student: Student;
   onUpdateStudent: (student: Student) => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 export function EditStudentDialog({
   student,
   onUpdateStudent,
   children,
+  defaultOpen = false,
+  onOpenChange,
 }: EditStudentDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const { toast } = useToast();
   const { getSubjectsForGroup } = useAcademicStructure();
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    onOpenChange?.(newOpen);
+  };
 
 
   const form = useForm<StudentFormValues>({
     resolver: zodResolver(studentFormSchema),
     defaultValues: student,
   });
-  
+
   const { fields } = useFieldArray({
     control: form.control,
     name: "subjects",
   });
-  
+
   const watchedSubjects = form.watch("subjects");
 
   const { reset, formState: { isSubmitting } } = form;
@@ -71,31 +80,31 @@ export function EditStudentDialog({
   useEffect(() => {
     if (open) {
       const standardSubjects = getSubjectsForGroup(student.batch, student.class, student.semester);
-      
+
       let subjectsForForm: StudentFormValues['subjects'] = [];
 
       if (standardSubjects.length > 0) {
         subjectsForForm = standardSubjects.map(standardSub => {
-            const existingSubject = student.subjects?.find(s => s.subjectId === standardSub.id);
-            return {
-              subjectId: standardSub.id,
-              subjectName: standardSub.name,
-              internalMark1: existingSubject?.internalMark1 ?? 0,
-              internalMark2: existingSubject?.internalMark2 ?? 0,
-              totalAssignments: standardSub.totalAssignments ?? 5,
-              completedAssignments: existingSubject?.completedAssignments ?? 0,
-              subjectAttendancePercentage: existingSubject?.subjectAttendancePercentage ?? 100,
-            };
+          const existingSubject = student.subjects?.find(s => s.subjectId === standardSub.id);
+          return {
+            subjectId: standardSub.id,
+            subjectName: standardSub.name,
+            internalMark1: existingSubject?.internalMark1 ?? 0,
+            internalMark2: existingSubject?.internalMark2 ?? 0,
+            totalAssignments: standardSub.totalAssignments ?? 5,
+            completedAssignments: existingSubject?.completedAssignments ?? 0,
+            subjectAttendancePercentage: existingSubject?.subjectAttendancePercentage ?? 100,
+          };
         });
       } else if (student.subjects) {
-          subjectsForForm = student.subjects.map(s => ({
-              ...s,
-              internalMark1: s.internalMark1 ?? 0,
-              internalMark2: s.internalMark2 ?? 0,
-              completedAssignments: s.completedAssignments ?? 0,
-              totalAssignments: s.totalAssignments ?? 5,
-              subjectAttendancePercentage: s.subjectAttendancePercentage ?? 100,
-          }));
+        subjectsForForm = student.subjects.map(s => ({
+          ...s,
+          internalMark1: s.internalMark1 ?? 0,
+          internalMark2: s.internalMark2 ?? 0,
+          completedAssignments: s.completedAssignments ?? 0,
+          totalAssignments: s.totalAssignments ?? 5,
+          subjectAttendancePercentage: s.subjectAttendancePercentage ?? 100,
+        }));
       }
 
       reset({
@@ -108,29 +117,29 @@ export function EditStudentDialog({
 
   const onSubmit = (data: StudentFormValues) => {
     const { rollNumber, ...studentData } = data;
-    
+
     const standardSubjects = getSubjectsForGroup(student.batch, student.class, student.semester);
 
     const subjectsWithTotals = (studentData.subjects || []).map(formSubject => {
-        const standardSubject = standardSubjects.find(s => s.id === formSubject.subjectId);
-        return {
-            ...formSubject,
-            internalMark1: formSubject.internalMark1 ?? 0,
-            internalMark2: formSubject.internalMark2 ?? 0,
-            completedAssignments: formSubject.completedAssignments ?? 0,
-            totalAssignments: standardSubject?.totalAssignments ?? formSubject.totalAssignments ?? 5,
-            subjectAttendancePercentage: formSubject.subjectAttendancePercentage ?? 100,
-        };
+      const standardSubject = standardSubjects.find(s => s.id === formSubject.subjectId);
+      return {
+        ...formSubject,
+        internalMark1: formSubject.internalMark1 ?? 0,
+        internalMark2: formSubject.internalMark2 ?? 0,
+        completedAssignments: formSubject.completedAssignments ?? 0,
+        totalAssignments: standardSubject?.totalAssignments ?? formSubject.totalAssignments ?? 5,
+        subjectAttendancePercentage: formSubject.subjectAttendancePercentage ?? 100,
+      };
     });
 
-    const totalMarksPossible = subjectsWithTotals.length * 80; 
+    const totalMarksPossible = subjectsWithTotals.length * 80;
     const totalMarksObtained = subjectsWithTotals.reduce((acc, subj) => acc + subj.internalMark1 + subj.internalMark2, 0);
 
     const overallAverageMarkPercentage = totalMarksPossible > 0 ? (totalMarksObtained / totalMarksPossible) * 100 : 0;
-    
+
     const totalPossibleAssignments = subjectsWithTotals.reduce((acc, s) => acc + s.totalAssignments, 0);
     const totalCompletedAssignments = subjectsWithTotals.reduce((acc, s) => acc + s.completedAssignments, 0);
-    
+
     const assignmentCompletionPercentage =
       totalPossibleAssignments > 0
         ? (totalCompletedAssignments / totalPossibleAssignments) * 100
@@ -138,8 +147,8 @@ export function EditStudentDialog({
 
     const subjectAttendances = subjectsWithTotals.map(s => s.subjectAttendancePercentage);
     const averageAttendance = subjectAttendances.length > 0
-        ? subjectAttendances.reduce((acc, a) => acc + a, 0) / subjectAttendances.length
-        : 100;
+      ? subjectAttendances.reduce((acc, a) => acc + a, 0) / subjectAttendances.length
+      : 100;
 
     const updatedStudent: Student = {
       ...student,
@@ -161,12 +170,12 @@ export function EditStudentDialog({
       title: "Student Updated",
       description: `${data.name}'s information has been updated and analysis is running.`,
     });
-    setOpen(false);
+    handleOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Edit Student Information</DialogTitle>
@@ -178,7 +187,7 @@ export function EditStudentDialog({
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <ScrollArea className="h-[60vh] pr-6">
               <div className="space-y-4">
-                 <FormField
+                <FormField
                   control={form.control}
                   name="rollNumber"
                   render={({ field }) => (
@@ -228,8 +237,8 @@ export function EditStudentDialog({
                           <Input
                             type="number"
                             {...field}
-                             onChange={(e) => field.onChange(+e.target.value)}
-                             value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                            value={field.value ?? ''}
                           />
                         </FormControl>
                         <FormMessage />
@@ -290,8 +299,8 @@ export function EditStudentDialog({
                     </FormItem>
                   )}
                 />
-                 <div className="grid grid-cols-3 gap-4">
-                   <FormField
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
                     control={form.control}
                     name="batch"
                     render={({ field }) => (
@@ -304,7 +313,7 @@ export function EditStudentDialog({
                       </FormItem>
                     )}
                   />
-                   <FormField
+                  <FormField
                     control={form.control}
                     name="class"
                     render={({ field }) => (
@@ -317,7 +326,7 @@ export function EditStudentDialog({
                       </FormItem>
                     )}
                   />
-                   <FormField
+                  <FormField
                     control={form.control}
                     name="semester"
                     render={({ field }) => (
@@ -331,127 +340,138 @@ export function EditStudentDialog({
                     )}
                   />
                 </div>
-                
-                 <Separator />
-                
+
+                <Separator />
+
                 <div className="space-y-4">
                   <FormLabel>Subjects, Marks & Assignments</FormLabel>
                   {fields.map((field, index) => {
-                      const totalAssignments = watchedSubjects?.[index]?.totalAssignments || 0;
-                      const completedAssignmentsValue = watchedSubjects?.[index]?.completedAssignments;
-                      const completedAssignments = typeof completedAssignmentsValue === 'number' && !isNaN(completedAssignmentsValue) ? completedAssignmentsValue : 0;
-                      const pendingAssignments = totalAssignments - completedAssignments;
-                      
-                      return (
-                        <div key={field.id} className="p-4 border rounded-lg space-y-4">
-                           <input
-                             type="hidden"
-                             {...form.register(`subjects.${index}.totalAssignments`)}
-                           />
+                    const totalAssignments = watchedSubjects?.[index]?.totalAssignments || 0;
+                    const completedAssignmentsValue = watchedSubjects?.[index]?.completedAssignments;
+                    const completedAssignments = typeof completedAssignmentsValue === 'number' && !isNaN(completedAssignmentsValue) ? completedAssignmentsValue : 0;
+                    const pendingAssignments = totalAssignments - completedAssignments;
+
+                    return (
+                      <div key={field.id} className="p-4 border rounded-lg space-y-4">
+                        <input
+                          type="hidden"
+                          {...form.register(`subjects.${index}.totalAssignments`)}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`subjects.${index}.subjectName`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Subject Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} disabled />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
-                            name={`subjects.${index}.subjectName`}
+                            name={`subjects.${index}.internalMark1`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Subject Name</FormLabel>
+                                <FormLabel>Internal Mark 1 (40)</FormLabel>
                                 <FormControl>
-                                  <Input {...field} disabled />
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    min={0}
+                                    max={40}
+                                    {...field}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                    value={field.value ?? ''}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                              control={form.control}
-                              name={`subjects.${index}.internalMark1`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Internal Mark 1 (40)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      {...field}
-                                      onChange={(e) => field.onChange(+e.target.value)}
-                                      value={field.value ?? ""}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`subjects.${index}.internalMark2`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Internal Mark 2 (40)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      {...field}
-                                      onChange={(e) => field.onChange(+e.target.value)}
-                                      value={field.value ?? ""}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                          <Separator className="my-2" />
-                          <div className="grid grid-cols-2 gap-4 items-start">
-                            <FormField
-                              control={form.control}
-                              name={`subjects.${index}.completedAssignments`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Completed Assignments</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      {...field}
-                                      onChange={(e) => field.onChange(+e.target.value)}
-                                      value={field.value ?? ""}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="text-sm space-y-1 pt-8">
-                              <p>Total: <span className="font-semibold">{totalAssignments}</span></p>
-                              <p>Pending: <span className="font-semibold">{pendingAssignments < 0 ? 0 : pendingAssignments}</span></p>
-                            </div>
-                          </div>
-                           <FormField
+                          <FormField
                             control={form.control}
-                            name={`subjects.${index}.subjectAttendancePercentage`}
+                            name={`subjects.${index}.internalMark2`}
                             render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Subject Attendance (%)</FormLabel>
+                              <FormItem>
+                                <FormLabel>Internal Mark 2 (40)</FormLabel>
                                 <FormControl>
-                                    <Input
-                                        type="number"
-                                        {...field}
-                                        onChange={(e) => field.onChange(+e.target.value)}
-                                        value={field.value ?? ""}
-                                    />
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    min={0}
+                                    max={40}
+                                    {...field}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                    value={field.value ?? ''}
+                                  />
                                 </FormControl>
                                 <FormMessage />
-                                </FormItem>
+                              </FormItem>
                             )}
-                        />
+                          />
                         </div>
-                      );
-                    })}
-                   {fields.length === 0 && (
-                     <p className="text-sm text-muted-foreground text-center py-4">No subjects configured for this student's academic group.</p>
+                        <Separator className="my-2" />
+                        <div className="grid grid-cols-2 gap-4 items-start">
+                          <FormField
+                            control={form.control}
+                            name={`subjects.${index}.completedAssignments`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Completed Assignments</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="1"
+                                    min={0}
+                                    {...field}
+                                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : parseInt(e.target.value, 10))}
+                                    value={field.value ?? ''}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="text-sm space-y-1 pt-8">
+                            <p>Total: <span className="font-semibold">{totalAssignments}</span></p>
+                            <p>Pending: <span className="font-semibold">{pendingAssignments < 0 ? 0 : pendingAssignments}</span></p>
+                          </div>
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name={`subjects.${index}.subjectAttendancePercentage`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Subject Attendance (%)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  min={0}
+                                  max={100}
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.value)}
+                                  value={field.value ?? ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    );
+                  })}
+                  {fields.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">No subjects configured for this student's academic group.</p>
                   )}
                   <FormMessage>{form.formState.errors.subjects?.root?.message}</FormMessage>
                 </div>
-                
-                 <Separator />
+
+                <Separator />
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
@@ -463,10 +483,12 @@ export function EditStudentDialog({
                         <FormControl>
                           <Input
                             type="number"
-                            step="0.1"
+                            step="any"
+                            min={0}
+                            max={10}
                             {...field}
-                            onChange={(e) => field.onChange(+e.target.value)}
-                            value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            value={field.value ?? ''}
                           />
                         </FormControl>
                         <FormMessage />
@@ -474,7 +496,7 @@ export function EditStudentDialog({
                     )}
                   />
                 </div>
-                 <p className="text-sm text-muted-foreground mt-4">
+                <p className="text-sm text-muted-foreground mt-4">
                   Overall assignment counts and attendance are calculated automatically from the subject data upon submission.
                 </p>
               </div>

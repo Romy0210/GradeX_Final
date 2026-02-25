@@ -38,6 +38,15 @@ export function AttendanceTable({ data }: { data: MonitoredData[] }) {
 
     const TOTAL_SESSIONS = 60; // Standardized total sessions per subject
 
+    // Group the flattened data by studentId
+    const groupedData = data.reduce((acc, item) => {
+        if (!acc[item.studentId]) {
+            acc[item.studentId] = [];
+        }
+        acc[item.studentId].push(item);
+        return acc;
+    }, {} as Record<string, MonitoredData[]>);
+
     return (
         <>
             <div className="border rounded-lg">
@@ -55,32 +64,38 @@ export function AttendanceTable({ data }: { data: MonitoredData[] }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {data.length > 0 ? data.map(item => {
-                            const risk = getAttendanceRisk(item.attendancePercentage);
-                            const present = Math.round(TOTAL_SESSIONS * (item.attendancePercentage / 100));
-                            const absent = TOTAL_SESSIONS - present;
-                            return (
-                                <TableRow key={`${item.studentId}-${item.subjectId}`}>
-                                    <TableCell>
-                                        <div className="font-medium">{item.studentName}</div>
-                                        <div className="text-sm text-muted-foreground">{item.studentId}</div>
-                                    </TableCell>
-                                    <TableCell>{item.subjectName}</TableCell>
-                                    <TableCell className="text-center font-mono">{item.attendancePercentage.toFixed(1)}%</TableCell>
-                                    <TableCell className="text-center">
-                                        <Badge variant={getRiskBadgeVariant(risk)}>{risk}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-center font-mono">{TOTAL_SESSIONS}</TableCell>
-                                    <TableCell className="text-center font-mono">{present}</TableCell>
-                                    <TableCell className="text-center font-mono">{absent}</TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" onClick={() => setAlertingStudent(item)}>
-                                            <Bell className="h-4 w-4" />
-                                            <span className="sr-only">Send Alert</span>
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            );
+                        {Object.values(groupedData).length > 0 ? Object.values(groupedData).map(group => {
+                            return group.map((item, index) => {
+                                const risk = getAttendanceRisk(item.attendancePercentage);
+                                const present = Math.round(TOTAL_SESSIONS * (item.attendancePercentage / 100));
+                                const absent = TOTAL_SESSIONS - present;
+                                const isFirstRow = index === 0;
+
+                                return (
+                                    <TableRow key={`${item.studentId}-${item.subjectId}`}>
+                                        {isFirstRow && (
+                                            <TableCell rowSpan={group.length} className="align-top border-r bg-muted/30">
+                                                <div className="font-medium">{item.studentName}</div>
+                                                <div className="text-xs text-muted-foreground mt-1">{item.studentId}</div>
+                                            </TableCell>
+                                        )}
+                                        <TableCell>{item.subjectName}</TableCell>
+                                        <TableCell className="text-center font-mono">{item.attendancePercentage.toFixed(1)}%</TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant={getRiskBadgeVariant(risk)}>{risk}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-center font-mono">{TOTAL_SESSIONS}</TableCell>
+                                        <TableCell className="text-center font-mono">{present}</TableCell>
+                                        <TableCell className="text-center font-mono">{absent}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" onClick={() => setAlertingStudent(item)}>
+                                                <Bell className="h-4 w-4" />
+                                                <span className="sr-only">Send Alert</span>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            });
                         }) : (
                             <TableRow>
                                 <TableCell colSpan={8} className="h-24 text-center">
@@ -91,7 +106,7 @@ export function AttendanceTable({ data }: { data: MonitoredData[] }) {
                     </TableBody>
                 </Table>
             </div>
-             <AlertDialog open={!!alertingStudent} onOpenChange={(open) => !open && setAlertingStudent(null)}>
+            <AlertDialog open={!!alertingStudent} onOpenChange={(open) => !open && setAlertingStudent(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Confirm Alert</AlertDialogTitle>

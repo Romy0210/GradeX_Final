@@ -103,8 +103,8 @@ export function Recommendations({ student }: RecommendationsProps) {
       }
 
       const result = await response.json();
-       setRecommendations(result);
-       toast({
+      setRecommendations(result);
+      toast({
         title: "Recommendations Generated",
         description: "Your AI-powered advice is ready.",
       });
@@ -145,7 +145,7 @@ export function Recommendations({ student }: RecommendationsProps) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-           <Lightbulb className="w-6 h-6 text-primary" />
+          <Lightbulb className="w-6 h-6 text-primary" />
           AI-Powered Recommendations
         </CardTitle>
         <CardDescription>
@@ -154,26 +154,26 @@ export function Recommendations({ student }: RecommendationsProps) {
       </CardHeader>
       <CardContent>
         {!recommendations && !isLoading ? (
-           <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/20">
-                <p className="text-muted-foreground mb-4">Get personalized tips based on your performance.</p>
-                <Button onClick={handleGenerateRecommendations}>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate My Recommendations
-                </Button>
-            </div>
+          <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/20">
+            <p className="text-muted-foreground mb-4">Get personalized tips based on your performance.</p>
+            <Button onClick={handleGenerateRecommendations}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate My Recommendations
+            </Button>
+          </div>
         ) : (
-           <div className="space-y-6">
-             {visibleSections.map((section, index) => (
-                <React.Fragment key={section.title}>
-                  <RecommendationCategory
-                    icon={section.icon}
-                    title={section.title}
-                    text={section.text}
-                    isLoading={isLoading}
-                  />
-                  {index < visibleSections.length - 1 && <Separator />}
-                </React.Fragment>
-              ))}
+          <div className="space-y-6">
+            {visibleSections.map((section, index) => (
+              <React.Fragment key={section.title}>
+                <RecommendationCategory
+                  icon={section.icon}
+                  title={section.title}
+                  text={section.text}
+                  isLoading={isLoading}
+                />
+                {index < visibleSections.length - 1 && <Separator />}
+              </React.Fragment>
+            ))}
           </div>
         )}
       </CardContent>

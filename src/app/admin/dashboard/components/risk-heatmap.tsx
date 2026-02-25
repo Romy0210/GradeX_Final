@@ -11,17 +11,26 @@ type RiskHeatmapProps = {
 }
 
 const groupAndAnalyze = (students: Student[]) => {
-  const groups = students.reduce((acc, student) => {
-    const key = `${student.batch}|${student.class}|${student.semester}`;
-    if (!acc[key]) {
-      acc[key] = { batch: student.batch, class: student.class, semester: student.semester, high: 0, medium: 0, low: 0, total: 0 };
-    }
-    acc[key][student.riskLevel.toLowerCase() as 'high' | 'medium' | 'low']++;
-    acc[key].total++;
-    return acc;
-  }, {} as Record<string, { batch: string; class: string; semester: string; high: number; medium: number; low: number; total: number; }>);
+    const groups = students.reduce((acc, student) => {
+        const key = `${student.batch}|${student.class}|${student.semester}`;
+        if (!acc[key]) {
+            acc[key] = { batch: student.batch, class: student.class, semester: student.semester, high: 0, medium: 0, low: 0, total: 0 };
+        }
+        const isHighRisk = student.riskLevel === 'High' || (student.subjectAnalyses?.some(sub => sub.riskLevel === 'High') ?? false);
 
-  return Object.values(groups);
+        if (isHighRisk) {
+            acc[key].high++;
+        } else if (student.riskLevel === 'Medium') {
+            acc[key].medium++;
+        } else {
+            acc[key].low++;
+        }
+
+        acc[key].total++;
+        return acc;
+    }, {} as Record<string, { batch: string; class: string; semester: string; high: number; medium: number; low: number; total: number; }>);
+
+    return Object.values(groups);
 };
 
 const getRiskColor = (highRiskPercent: number): string => {
@@ -62,7 +71,7 @@ export default function RiskHeatmap({ students }: RiskHeatmapProps) {
                             <TableRow>
                                 <TableHead>Batch</TableHead>
                                 <TableHead>Class</TableHead>
-                                <TableHead>Sem</TableHead>
+                                <TableHead className="text-center">Sem</TableHead>
                                 <TableHead className="text-center">High</TableHead>
                                 <TableHead className="text-center">Medium</TableHead>
                                 <TableHead className="text-center">Low</TableHead>
@@ -73,9 +82,9 @@ export default function RiskHeatmap({ students }: RiskHeatmapProps) {
                                 const highRiskPercent = group.total > 0 ? (group.high / group.total) * 100 : 0;
                                 const mediumRiskPercent = group.total > 0 ? (group.medium / group.total) * 100 : 0;
                                 const lowRiskPercent = group.total > 0 ? (group.low / group.total) * 100 : 0;
-                                
+
                                 const colorClass = getRiskColor(highRiskPercent);
-                                
+
                                 const tooltipContent = (
                                     <div className="p-1 space-y-1">
                                         <div className="font-semibold text-foreground">{group.class} - Sem {group.semester}</div>
@@ -90,7 +99,7 @@ export default function RiskHeatmap({ students }: RiskHeatmapProps) {
                                             <span className="h-2 w-2 rounded-full bg-yellow-500" />
                                             Medium Risk: {group.medium} ({mediumRiskPercent.toFixed(0)}%)
                                         </div>
-                                         <div className="text-sm flex items-center gap-2">
+                                        <div className="text-sm flex items-center gap-2">
                                             <span className="h-2 w-2 rounded-full bg-green-500" />
                                             Low Risk: {group.low} ({lowRiskPercent.toFixed(0)}%)
                                         </div>

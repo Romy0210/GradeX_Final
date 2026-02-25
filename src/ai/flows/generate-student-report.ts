@@ -8,8 +8,7 @@
  * - GenerateStudentReportOutput - The return type for the generateStudentReport function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import { z } from 'zod';
 import { runStudentAnalysis } from './run-student-analysis';
 import { generatePersonalizedRecommendations } from './generate-personalized-recommendations';
 
@@ -34,26 +33,26 @@ const RunStudentAnalysisInputSchema = z.object({
 });
 
 const SubjectAnalysisOutputSchema = z.object({
-    subjectId: z.string(),
-    subjectName: z.string(),
-    riskLevel: z.enum(['Low', 'Medium', 'High']),
-    outcome: z.enum(['Pass', 'Fail']),
-    gradeCategory: z.enum(['S', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F']),
+  subjectId: z.string(),
+  subjectName: z.string(),
+  riskLevel: z.enum(['Low', 'Medium', 'High']),
+  outcome: z.enum(['Pass', 'Fail']),
+  gradeCategory: z.enum(['S', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F']),
 });
 
 const RunStudentAnalysisOutputSchema = z.object({
-    riskLevel: z.enum(['Low', 'Medium', 'High']).describe('The predicted risk level of the student.'),
-    outcome: z.enum(['Pass', 'Fail']).describe('The predicted outcome for the student.'),
-    gradeCategory: z.enum(['S', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F']).describe('The predicted grade category for the student.'),
-    predictionConfidence: z.number().optional().describe('The prediction confidence (if outcome is Pass) as a percentage.'),
-    failureRiskProbability: z.number().optional().describe('The failure risk probability (if outcome is Fail) as a percentage.'),
-    subjectAnalyses: z.array(SubjectAnalysisOutputSchema).optional(),
+  riskLevel: z.enum(['Low', 'Medium', 'High']).describe('The predicted risk level of the student.'),
+  outcome: z.enum(['Pass', 'Fail']).describe('The predicted outcome for the student.'),
+  gradeCategory: z.enum(['S', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F']).describe('The predicted grade category for the student.'),
+  predictionConfidence: z.number().optional().describe('The prediction confidence (if outcome is Pass) as a percentage.'),
+  failureRiskProbability: z.number().optional().describe('The failure risk probability (if outcome is Fail) as a percentage.'),
+  subjectAnalyses: z.array(SubjectAnalysisOutputSchema).optional(),
 });
 
 const SubjectRecommendationSchema = z.object({
-    subjectId: z.string(),
-    subjectName: z.string(),
-    recommendation: z.string(),
+  subjectId: z.string(),
+  subjectName: z.string(),
+  recommendation: z.string(),
 });
 
 const PersonalizedRecommendationsOutputSchema = z.object({
@@ -73,39 +72,27 @@ export type GenerateStudentReportOutput = z.infer<typeof GenerateStudentReportOu
 export async function generateStudentReport(
   input: GenerateStudentReportInput
 ): Promise<GenerateStudentReportOutput> {
-  return generateStudentReportFlow(input);
+  const analysisResult = await runStudentAnalysis(input);
+
+  const recommendationsResult = await generatePersonalizedRecommendations({
+    riskLevel: analysisResult.riskLevel,
+    outcome: analysisResult.outcome,
+    gradeCategory: analysisResult.gradeCategory,
+    academicPerformance: `GPA: ${input.gpa}, Avg Mark: ${input.overallAverageMarkPercentage}%`,
+    attendancePercentage: input.attendancePercentage,
+    assignmentCompletionPercentage: input.assignmentCompletionPercentage,
+    pendingAssignments: input.pendingAssignments,
+    subjectAnalyses: analysisResult.subjectAnalyses?.map(analysis => {
+      const originalSubject = input.subjects?.find(s => s.subjectId === analysis.subjectId);
+      return {
+        ...analysis,
+        subjectAttendancePercentage: originalSubject?.subjectAttendancePercentage
+      };
+    })
+  });
+
+  return {
+    ...analysisResult,
+    ...recommendationsResult,
+  };
 }
-
-
-const generateStudentReportFlow = ai.defineFlow(
-  {
-    name: 'generateStudentReportFlow',
-    inputSchema: GenerateStudentReportInputSchema,
-    outputSchema: GenerateStudentReportOutputSchema,
-  },
-  async (input) => {
-    const analysisResult = await runStudentAnalysis(input);
-
-    const recommendationsResult = await generatePersonalizedRecommendations({
-        riskLevel: analysisResult.riskLevel,
-        outcome: analysisResult.outcome,
-        gradeCategory: analysisResult.gradeCategory,
-        academicPerformance: `GPA: ${input.gpa}, Avg Mark: ${input.overallAverageMarkPercentage}%`,
-        attendancePercentage: input.attendancePercentage,
-        assignmentCompletionPercentage: input.assignmentCompletionPercentage,
-        pendingAssignments: input.pendingAssignments,
-        subjectAnalyses: analysisResult.subjectAnalyses?.map(analysis => {
-            const originalSubject = input.subjects?.find(s => s.subjectId === analysis.subjectId);
-            return {
-                ...analysis,
-                subjectAttendancePercentage: originalSubject?.subjectAttendancePercentage
-            };
-        })
-    });
-
-    return {
-      ...analysisResult,
-      ...recommendationsResult,
-    };
-  }
-);
