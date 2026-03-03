@@ -97,7 +97,8 @@ ${input.subjects.map(s => `---
     *   \`Subject Composite Score = (Subject Average Mark Percentage * 0.6) + (Normalized Subject Assignment Score * 0.2) + (Normalized Subject Attendance Score * 0.2)\`
 
 3.  **DETERMINE SUBJECT GRADE:**
-    *   Assign a grade based on the \`Subject Composite Score\` using the same grade bands as the overall analysis. There is NO GPA adjustment for subject grades.
+    *   Assign a grade based on the \`Subject Composite Score\` using the same grade bands as the overall analysis.
+    *   ** CRITICAL OVERRIDE:** If \`Subject Average Mark Percentage\` is less than 40%, the final subject grade MUST be 'F', regardless of the composite score. There is NO GPA adjustment for subject grades.
 
 4.  **DETERMINE SUBJECT RISK LEVEL (FROM GRADE):**
     *   \`S\`, \`A+\`, \`A\` -> \`Low\`
@@ -126,11 +127,13 @@ Return ONLY valid JSON that matches the output schema. No explanations.
 1.  **RISK LEVEL**: Determine the risk level by following these rules in order. The first category the student falls into is their final risk level.
     *   **A. High Risk**: A student is 'High' risk if ANY of the following are true:
         *   GPA is less than ${input.highRiskThreshold ?? 6.5}
+        *   Overall Average Mark Percentage is less than 40%
         *   Attendance Percentage is less than 80%
         *   Assignment Completion Percentage is less than 70%
         *   Pending Assignments is 3 or more
     *   **B. Low Risk**: If the student is NOT 'High' risk, they are 'Low' risk if ALL of the following are true:
         *   GPA is greater than ${input.lowRiskThreshold ?? 8.0}
+        *   Overall Average Mark Percentage is 70% or greater
         *   Attendance Percentage is 90% or greater
         *   Assignment Completion Percentage is 85% or greater
         *   Pending Assignments is 0
