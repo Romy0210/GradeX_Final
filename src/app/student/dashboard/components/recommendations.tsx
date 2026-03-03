@@ -90,7 +90,7 @@ export function Recommendations({ student }: RecommendationsProps) {
           riskLevel: student.riskLevel,
           outcome: student.outcome,
           gradeCategory: student.gradeCategory,
-          academicPerformance: `GPA: ${student.gpa}, Avg Mark: ${student.averageMarkPercentage}%`,
+          academicPerformance: `GPA: ${student.gpa}, Avg Mark: ${student.overallAverageMarkPercentage}%`,
           attendancePercentage: student.attendancePercentage,
           assignmentCompletionPercentage: student.assignmentCompletionPercentage,
           pendingAssignments: student.pendingAssignments,
