@@ -204,20 +204,23 @@ export function StudentTable({
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onSelect={() => setEditTarget(student)}
+                          onSelect={() => {
+                            // Delay opening the dialog until the DropdownMenu has started closing
+                            setTimeout(() => {
+                              setEditTarget(student);
+                            }, 150);
+                          }}
                           disabled={isAnyAnalysisRunning}
                         >
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onSelect={(e) => {
-                            e.preventDefault();
+                          onSelect={() => {
                             // Delay triggering the AlertDialog until the DropdownMenu has fully closed
-                            // This prevents Radix UI from racing `pointer-events: none` on the document body
                             setTimeout(() => {
-                              onDeleteStudent(student.id)
-                            }, 50);
+                              onDeleteStudent(student.id);
+                            }, 150);
                           }}
                           disabled={isAnyAnalysisRunning}
                           className="text-destructive focus:text-destructive"
@@ -229,7 +232,12 @@ export function StudentTable({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <DropdownMenuItem
-                              onSelect={() => onReRunAnalysis(student.id)}
+                              onSelect={() => {
+                                // Delay the state update until dropdown close animation starts
+                                setTimeout(() => {
+                                  onReRunAnalysis(student.id);
+                                }, 150);
+                              }}
                               disabled={isAnyAnalysisRunning}
                             >
                               {isAnalyzingThisStudent ? (

@@ -164,13 +164,17 @@ export function EditStudentDialog({
       assignmentCompletionPercentage: Math.round(assignmentCompletionPercentage),
     };
 
-    onUpdateStudent(updatedStudent);
-
     toast({
       title: "Student Updated",
       description: `${data.name}'s information has been updated and analysis is running.`,
     });
     handleOpenChange(false);
+
+    // Delay the massive state update to ensure the Radix dialog finishes its exit animation
+    // and properly restores pointer-events on the document body.
+    setTimeout(() => {
+      onUpdateStudent(updatedStudent);
+    }, 400);
   };
 
   return (

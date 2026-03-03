@@ -59,7 +59,7 @@ export default function StudentProfilePage() {
 
   useEffect(() => {
     if (user && students.length > 0) {
-      setStudentData(students.find(s => s.id === user.uid));
+      setStudentData(students.find(s => s.authUid === user.uid) || students.find(s => s.id === user.uid) || null);
     }
   }, [user, students]);
 

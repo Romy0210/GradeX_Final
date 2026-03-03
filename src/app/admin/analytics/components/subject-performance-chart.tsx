@@ -2,10 +2,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Label } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Legend, Label } from "recharts";
 import type { Student } from "@/lib/data";
 import {
   ChartContainer,
+  ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { useAcademicStructure } from "@/context/academic-structure-provider";
@@ -139,26 +140,19 @@ export default function SubjectPerformanceChart({ data, filters }: SubjectPerfor
             </>
           )}
 
-          <Tooltip
+          <ChartTooltip
             cursor={{ fill: "hsl(var(--muted))" }}
-            content={(props) => {
-              // Render the raw properties carefully, falling back to standard if needed
-              return (
-                <ChartTooltipContent
-                  {...props}
-                  hideLabel={false}
-                  labelFormatter={(label, payload) => {
-                    // The payload contains the full 'name' and 'abbreviation'
-                    // ChartTooltipContent uses `label`, which is the abbreviation here. 
-                    // Let's grab the full name from the payload so it shows in the tooltip header.
-                    if (payload && payload.length > 0 && payload[0].payload) {
-                      return payload[0].payload.name;
-                    }
-                    return label;
-                  }}
-                />
-              )
-            }}
+            content={
+              <ChartTooltipContent
+                hideLabel={false}
+                labelFormatter={(label, payload) => {
+                  if (payload && payload.length > 0 && payload[0].payload) {
+                    return payload[0].payload.name;
+                  }
+                  return label;
+                }}
+              />
+            }
           />
           <Legend />
           <Bar dataKey="averageMark" fill="var(--color-averageMark)" radius={4} />
