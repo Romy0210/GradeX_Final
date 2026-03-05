@@ -3,10 +3,10 @@
 /**
  * @fileOverview
  * Runs a full analysis on a student's performance to predict risk,
- * outcome, grade, and confidence, including subject-wise breakdown.
+ * outcome, grade, and confidence, using the new local Machine Learning FastAPI prediction service.
+ * Includes deterministic subject-wise breakdown.
  */
 
-import { openrouter, MODEL } from '@/ai/genkit';
 import { z } from 'zod';
 
 /* ===============================
@@ -55,6 +55,7 @@ const RunStudentAnalysisOutputSchema = z.object({
   predictionConfidence: z.number().optional(),
   failureRiskProbability: z.number().optional(),
   subjectAnalyses: z.array(SubjectAnalysisOutputSchema).optional().describe("An array of AI analyses for each individual subject."),
+  topFactors: z.array(z.string()).optional().describe("SHAP generated explanatory factors from the ML Model"),
 });
 
 export type RunStudentAnalysisOutput = z.infer<
@@ -68,126 +69,121 @@ export type RunStudentAnalysisOutput = z.infer<
 export async function runStudentAnalysis(
   input: RunStudentAnalysisInput
 ): Promise<RunStudentAnalysisOutput> {
-  // Build subject data section
-  let subjectSection = '';
-  if (input.subjects && input.subjects.length > 0) {
-    subjectSection = `
-**PART 2: SUBJECT-WISE ANALYSIS**
-For each subject below, perform a separate analysis using the subject-wise rules.
 
-${input.subjects.map(s => `---
-**SUBJECT TO ANALYZE:**
-- subjectId: "${s.subjectId}"
-- subjectName: "${s.subjectName}"
-- internalMark1: ${s.internalMark1}
-- internalMark2: ${s.internalMark2}
-- totalAssignments: ${s.totalAssignments}
-- completedAssignments: ${s.completedAssignments}
-- subjectAttendancePercentage: ${s.subjectAttendancePercentage ?? 0}%
+  // 1. Call the Local FastAPI Machine Learning Prediction Service
+  let mlPrediction;
+  try {
+    const response = await fetch("http://localhost:8000/predict", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        gpa: input.gpa,
+        attendancePercentage: input.attendancePercentage,
+        assignmentCompletionPercentage: input.assignmentCompletionPercentage,
+        pendingAssignments: input.pendingAssignments,
+        overallAverageMarkPercentage: input.overallAverageMarkPercentage,
+      }),
+      cache: "no-store", // Ensure fresh prediction
+    });
 
-**SUBJECT-WISE RULES (Apply in order):**
-1.  **CALCULATE & NORMALIZE SUBJECT INPUTS:**
-    *   **A. Subject Average Mark Percentage:** \`((internalMark1 + internalMark2) / 80) * 100\`.
-    *   **B. Normalized Subject Attendance Score:** Apply the same mapping as the overall analysis to \`subjectAttendancePercentage\`.
-    *   **C. Normalized Subject Assignment Score:**
-        *   If \`totalAssignments\` is 5, use this mapping based on \`completedAssignments\`: \`5 -> 100\`, \`4 -> 95\`, \`3 -> 85\`, \`2 -> 75\`, \`< 2 -> 60\`.
-        *   If \`totalAssignments\` is not 5, calculate completion percentage \`(completedAssignments / totalAssignments) * 100\` and use the **Normalized Assignment Score** map from the overall analysis.
+    if (!response.ok) {
+      throw new Error(`Failed to fetch from ML service: ${response.statusText}`);
+    }
 
-2.  **CALCULATE SUBJECT COMPOSITE SCORE:**
-    *   \`Subject Composite Score = (Subject Average Mark Percentage * 0.6) + (Normalized Subject Assignment Score * 0.2) + (Normalized Subject Attendance Score * 0.2)\`
-
-3.  **DETERMINE SUBJECT GRADE:**
-    *   Assign a grade based on the \`Subject Composite Score\` using the same grade bands as the overall analysis.
-    *   ** CRITICAL OVERRIDE:** If \`Subject Average Mark Percentage\` is less than 40%, the final subject grade MUST be 'F', regardless of the composite score. There is NO GPA adjustment for subject grades.
-
-4.  **DETERMINE SUBJECT RISK LEVEL (FROM GRADE):**
-    *   \`S\`, \`A+\`, \`A\` -> \`Low\`
-    *   \`B+\`, \`B\`, \`C+\`, \`C\`, \`D\` -> \`Medium\`
-    *   \`F\` -> \`High\`
-
-5.  **DETERMINE SUBJECT OUTCOME (FROM GRADE):**
-    *   \`F\` -> \`Fail\`
-    *   All other grades -> \`Pass\`
----`).join('\n')}`;
+    mlPrediction = await response.json();
+  } catch (error) {
+    console.error("ML Prediction Error:", error);
+    // Fallback if ML service is down or errors. 
+    // This allows the app to continue functioning gracefully by falling back to deterministic rules if the server isn't running.
+    mlPrediction = {
+      riskLevel: "Medium",
+      outcome: "Pass",
+      gradeCategory: "C",
+      probability: 0,
+      topFactors: ["ML Service Unavailable - using fallback predictions."]
+    };
   }
 
-  const prompt = `You are an expert academic analytics AI. Your task is to perform a deterministic analysis based on a strict set of rules.
-Return ONLY valid JSON that matches the output schema. No explanations.
+  // 2. Perform subject-wise deterministic analysis since the ML model focuses on overall student metrics
+  const subjectAnalyses = [];
+  if (input.subjects && input.subjects.length > 0) {
+    for (const s of input.subjects) {
+      // Calculate & Normalize
+      const avgMarkPercentage = ((s.internalMark1 + s.internalMark2) / 80) * 100;
+      const attendanceScore = s.subjectAttendancePercentage ?? 0;
 
-**PART 1: OVERALL STUDENT ANALYSIS**
+      let assignmentScore = 0;
+      if (s.totalAssignments === 5) {
+        if (s.completedAssignments === 5) assignmentScore = 100;
+        else if (s.completedAssignments === 4) assignmentScore = 95;
+        else if (s.completedAssignments === 3) assignmentScore = 85;
+        else if (s.completedAssignments === 2) assignmentScore = 75;
+        else assignmentScore = 60;
+      } else if (s.totalAssignments > 0) {
+        assignmentScore = (s.completedAssignments / s.totalAssignments) * 100;
+      }
 
-**OVERALL STUDENT DATA:**
-- GPA (out of 10): ${input.gpa}
-- Overall Average Mark Percentage: ${input.overallAverageMarkPercentage}%
-- Overall Assignment Completion Percentage: ${input.assignmentCompletionPercentage}%
-- Overall Avg. Attendance Percentage: ${input.attendancePercentage}%
+      // Composite Score
+      const compositeScore = (avgMarkPercentage * 0.6) + (assignmentScore * 0.2) + (attendanceScore * 0.2);
 
-**OVERALL RULES:**
+      // Determine Base Subject Grade
+      let baseGrade = 'F';
+      if (compositeScore >= 90) baseGrade = 'S';
+      else if (compositeScore >= 85) baseGrade = 'A+';
+      else if (compositeScore >= 80) baseGrade = 'A';
+      else if (compositeScore >= 75) baseGrade = 'B+';
+      else if (compositeScore >= 70) baseGrade = 'B';
+      else if (compositeScore >= 65) baseGrade = 'C+';
+      else if (compositeScore >= 60) baseGrade = 'C';
+      else if (compositeScore >= 55) baseGrade = 'D';
 
-1.  **RISK LEVEL**: Determine the risk level by following these rules in order. The first category the student falls into is their final risk level.
-    *   **A. High Risk**: A student is 'High' risk if ANY of the following are true:
-        *   GPA is less than ${input.highRiskThreshold ?? 6.5}
-        *   Overall Average Mark Percentage is less than 40%
-        *   Attendance Percentage is less than 80%
-        *   Assignment Completion Percentage is less than 70%
-        *   Pending Assignments is 3 or more
-    *   **B. Low Risk**: If the student is NOT 'High' risk, they are 'Low' risk if ALL of the following are true:
-        *   GPA is greater than ${input.lowRiskThreshold ?? 8.0}
-        *   Overall Average Mark Percentage is 70% or greater
-        *   Attendance Percentage is 90% or greater
-        *   Assignment Completion Percentage is 85% or greater
-        *   Pending Assignments is 0
-    *   **C. Medium Risk**: If the student is not 'High' risk and not 'Low' risk, they are 'Medium' risk.
+      // Critical override
+      if (avgMarkPercentage < 40) {
+        baseGrade = 'F';
+      }
 
-2.  **OUTCOME**:
-    *   \`Fail\` -> if RiskLevel is High
-    *   \`Pass\` -> if RiskLevel is Low or Medium
+      // Determine Subject Risk & Outcome
+      let riskLevel: 'Low' | 'Medium' | 'High' = 'Medium';
+      let outcome: 'Pass' | 'Fail' = 'Pass';
 
-3.  **GRADE** (based on Average Mark Percentage, GPA, and Risk Level):
-    *   **Step 1: Base Grade (Average Mark Percentage)**
-        *   \`90-100\`: 'S'
-        *   \`85-89\`: 'A+'
-        *   \`80-84\`: 'A'
-        *   \`75-79\`: 'B+'
-        *   \`70-74\`: 'B'
-        *   \`65-69\`: 'C+'
-        *   \`60-64\`: 'C'
-        *   \`55-59\`: 'D'
-        *   \`< 55\`: 'F'
-    *   **Step 2: GPA Adjustment**
-        *   GPA < 6.5 -> downgrade grade by 2 levels
-        *   GPA 6.5-7.4 -> downgrade grade by 1 level
-        *   GPA >= 8.5 -> upgrade grade by 1 level
-        *   Otherwise -> no change
-    *   **Step 3: Risk Level Adjustment**
-        *   RiskLevel is High -> final Grade = 'F'
-        *   RiskLevel is Medium -> downgrade grade by 1 level
-        *   RiskLevel is Low -> no change
-    *   **Step 4:** Ensure final grade is within 'S' to 'F' range.
+      if (['S', 'A+', 'A'].includes(baseGrade)) {
+        riskLevel = 'Low';
+      } else if (['B+', 'B', 'C+', 'C', 'D'].includes(baseGrade)) {
+        riskLevel = 'Medium';
+      } else if (baseGrade === 'F') {
+        riskLevel = 'High';
+        outcome = 'Fail';
+      }
 
-4.  **CONFIDENCE**:
-    *   If outcome is 'Pass' -> return \`predictionConfidence\` (0-100)
-    *   If outcome is 'Fail' -> return \`failureRiskProbability\` (0-100)
+      subjectAnalyses.push({
+        subjectId: s.subjectId,
+        subjectName: s.subjectName,
+        riskLevel,
+        outcome,
+        gradeCategory: baseGrade as any,
+      });
+    }
+  }
 
-${subjectSection}
+  // 3. Construct Final Output based on ML Prediction
+  const finalOutput: RunStudentAnalysisOutput = {
+    riskLevel: mlPrediction.riskLevel,
+    outcome: mlPrediction.outcome,
+    gradeCategory: mlPrediction.gradeCategory,
+    topFactors: mlPrediction.topFactors,
+  };
 
-Return ONLY JSON with this structure:
-{
-  "riskLevel": "Low" | "Medium" | "High",
-  "outcome": "Pass" | "Fail",
-  "gradeCategory": "S" | "A+" | "A" | "B+" | "B" | "C+" | "C" | "D" | "F",
-  "predictionConfidence": number (optional, only if outcome is Pass),
-  "failureRiskProbability": number (optional, only if outcome is Fail),
-  "subjectAnalyses": [ { "subjectId": "...", "subjectName": "...", "riskLevel": "...", "outcome": "...", "gradeCategory": "..." } ] (optional, only if subjects provided)
-}`;
+  if (mlPrediction.outcome === 'Pass') {
+    finalOutput.predictionConfidence = mlPrediction.probability;
+  } else {
+    finalOutput.failureRiskProbability = mlPrediction.probability;
+  }
 
-  const completion = await openrouter.chat.completions.create({
-    model: MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    response_format: { type: 'json_object' },
-  });
+  if (subjectAnalyses.length > 0) {
+    finalOutput.subjectAnalyses = subjectAnalyses;
+  }
 
-  const content = completion.choices[0]?.message?.content || '{}';
-  const parsed = JSON.parse(content);
-  return RunStudentAnalysisOutputSchema.parse(parsed);
+  return RunStudentAnalysisOutputSchema.parse(finalOutput);
 }

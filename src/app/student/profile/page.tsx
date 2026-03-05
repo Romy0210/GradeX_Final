@@ -59,7 +59,7 @@ export default function StudentProfilePage() {
 
   useEffect(() => {
     if (user && students.length > 0) {
-      setStudentData(students.find(s => s.authUid === user.uid) || students.find(s => s.id === user.uid) || null);
+      setStudentData(students.find(s => s.authUid === user.uid) || students.find(s => s.id === user.uid) || undefined);
     }
   }, [user, students]);
 
@@ -183,7 +183,7 @@ export default function StudentProfilePage() {
 
       toast({ title: "Profile updated successfully" });
       resetImageSelection();
-      form.reset(data, { keepIsDirty: false });
+      form.reset(data, { keepDirty: false });
 
     } catch (error: any) {
       toast({
