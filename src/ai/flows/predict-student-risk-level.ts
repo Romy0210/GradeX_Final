@@ -8,7 +8,6 @@
  * - PredictStudentRiskLevelOutput - The return type for the predictStudentRiskLevel function.
  */
 
-import { openrouter, MODEL } from '@/ai/genkit';
 import { z } from 'zod';
 
 const PredictStudentRiskLevelInputSchema = z.object({
@@ -30,41 +29,55 @@ export type PredictStudentRiskLevelOutput = z.infer<typeof PredictStudentRiskLev
 export async function predictStudentRiskLevel(
   input: PredictStudentRiskLevelInput
 ): Promise<PredictStudentRiskLevelOutput> {
-  const prompt = `You are an expert AI system designed to predict student academic risk with high accuracy. Your analysis must be based on a strict set of rules.
+  const mlApiUrl = process.env.ML_API_URL || 'http://localhost:8000/predict';
 
-Analyze the student's data and predict their risk level.
+  try {
+    const response = await fetch(mlApiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        gpa: input.gpa,
+        attendancePercentage: input.attendancePercentage,
+        assignmentCompletionPercentage: input.assignmentCompletion,
+        pendingAssignments: input.pendingAssignments,
+        // Approximate average mark from GPA if it's not provided by the current input schema
+        overallAverageMarkPercentage: input.gpa * 10
+      }),
+    });
 
-**Student Data:**
-- GPA (out of 10): ${input.gpa}
-- Attendance Percentage: ${input.attendancePercentage}%
-- Assignment Completion Percentage: ${input.assignmentCompletion}%
-- Pending Assignments: ${input.pendingAssignments}
+    if (!response.ok) {
+      console.error(`ML API Error: ${response.status} ${response.statusText}`);
+      const text = await response.text();
+      console.error(text);
+      throw new Error(`ML API responded with status: ${response.status}`);
+    }
 
-**Prediction Rules:**
+    const data = await response.json();
 
-**1. Risk Level Prediction:**
-- **high**: Assign if ANY of the following are true:
-    - GPA is below 6.5.
-    - Attendance is below 80%.
-    - Assignment Completion is below 70%.
-    - Pending Assignments are 3 or more.
-- **medium**: Assign if NOT high and ANY of the following are true:
-    - GPA is between 6.5 and 7.9.
-    - Attendance is between 80% and 89%.
-    - Pending Assignments are 1 or 2.
-- **low**: Assign if NOT high or medium. All metrics must be strong (e.g., GPA >= 8.0, Attendance >= 90%).
+    // Map capitalized riskLevel ('Low', 'Medium', 'High') to lowercase
+    let mappedRisk = (data.riskLevel || 'medium').toLowerCase();
+    if (!['low', 'medium', 'high'].includes(mappedRisk)) {
+      mappedRisk = 'medium';
+    }
 
-For the \`explanation\`, briefly state which rules were triggered to determine the risk level.
+    // Construct explanation from topFactors and probability
+    const factorsText = Array.isArray(data.topFactors) && data.topFactors.length > 0
+      ? data.topFactors.join(' ')
+      : "Based on academic and engagement metrics.";
 
-Return ONLY a JSON object with this exact format: { "riskLevel": "low" | "medium" | "high", "explanation": "..." }`;
+    const explanation = `Confidence: ${data.probability || 0}%. ${factorsText}`;
 
-  const completion = await openrouter.chat.completions.create({
-    model: MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    response_format: { type: 'json_object' },
-  });
+    return PredictStudentRiskLevelOutputSchema.parse({
+      riskLevel: mappedRisk,
+      explanation: explanation
+    });
 
-  const content = completion.choices[0]?.message?.content || '{}';
-  const parsed = JSON.parse(content);
-  return PredictStudentRiskLevelOutputSchema.parse(parsed);
+  } catch (error) {
+    console.error("ML Prediction Server request failed:", error);
+    // Fallback if the Python API is not running
+    return {
+      riskLevel: "medium",
+      explanation: "ML Prediction service is currently unavailable. Defaulting to medium risk."
+    };
+  }
 }

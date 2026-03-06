@@ -53,6 +53,7 @@ export type Student = {
   subjectAnalyses?: StudentSubjectAnalysis[];
   subjectRecommendations?: StudentSubjectRecommendation[];
   authUid?: string;
+  studyPlan?: string;
 };
 
 export const students: Student[] = [

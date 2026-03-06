@@ -11,9 +11,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useStudentData } from "@/context/student-data-provider";
 import type { Student } from "@/lib/data";
 import { type GenerateStudyPlanOutput } from "@/ai/flows/generate-study-plan";
-import { ScrollText, Sparkles } from "lucide-react";
+import { ScrollText, Sparkles, RefreshCw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Accordion,
@@ -27,7 +28,7 @@ import { Separator } from "@/components/ui/separator";
 // New component to render the parsed study plan
 const RenderStudyPlan = ({ plan }: { plan: string }) => {
   const sections = plan.split(/(?=^#\s|##\s|###\s)/m).map(p => p.trim()).filter(Boolean);
-  
+
   const weeklyScheduleIndex = sections.findIndex(sec => sec.startsWith('###'));
 
   const introSections = weeklyScheduleIndex > -1 ? sections.slice(0, weeklyScheduleIndex) : sections;
@@ -38,7 +39,7 @@ const RenderStudyPlan = ({ plan }: { plan: string }) => {
       if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold mt-4 mb-2">{line.substring(2)}</h1>;
       if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-semibold mt-3 mb-1">{line.substring(3)}</h2>;
       if (line.startsWith('### ')) return <h3 key={i} className="text-md font-medium mt-2">{line.substring(4)}</h3>;
-      if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-bold my-1">{line.substring(2, line.length-2)}</p>
+      if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-bold my-1">{line.substring(2, line.length - 2)}</p>
       if (line.startsWith('* ') || line.startsWith('- ')) return <li key={i} className="ml-4 list-disc text-muted-foreground">{line.substring(2)}</li>;
       if (line.trim() === '') return null;
       return <p key={i} className="text-muted-foreground my-1">{line}</p>;
@@ -46,41 +47,41 @@ const RenderStudyPlan = ({ plan }: { plan: string }) => {
   }
 
   return (
-      <div className="space-y-4">
-        {introSections.map((section, index) => (
-           <div key={`intro-${index}`}>
-              {renderMarkdownSection(section)}
-           </div>
-        ))}
-        
-        {weeklyScheduleSections.length > 0 && (
-          <>
+    <div className="space-y-4">
+      {introSections.map((section, index) => (
+        <div key={`intro-${index}`}>
+          {renderMarkdownSection(section)}
+        </div>
+      ))}
+
+      {weeklyScheduleSections.length > 0 && (
+        <>
           <Separator className="my-6" />
           <h2 className="text-xl font-bold mb-4">Your 7-Day Schedule</h2>
           <Accordion type="single" collapsible className="w-full" defaultValue="item-0">
-              {weeklyScheduleSections.map((day, index) => {
-                  const lines = day.split('\n');
-                  const title = lines[0].replace('###', '').trim();
-                  const tasks = lines.slice(1);
-                  
-                  return (
-                      <AccordionItem value={`item-${index}`} key={index}>
-                          <AccordionTrigger className="text-md font-semibold text-left">
-                              {title}
-                              <Badge variant="outline" className="ml-auto mr-4 font-normal">Suggested</Badge>
-                          </AccordionTrigger>
-                          <AccordionContent>
-                             <ul className="pl-2 space-y-2">
-                              {tasks.map((task, i) => task.trim().startsWith('- ') ? <li key={i} className="ml-4 list-disc text-muted-foreground">{task.substring(2)}</li> : null)}
-                             </ul>
-                          </AccordionContent>
-                      </AccordionItem>
-                  );
-              })}
+            {weeklyScheduleSections.map((day, index) => {
+              const lines = day.split('\n');
+              const title = lines[0].replace('###', '').trim();
+              const tasks = lines.slice(1);
+
+              return (
+                <AccordionItem value={`item-${index}`} key={index}>
+                  <AccordionTrigger className="text-md font-semibold text-left">
+                    {title}
+                    <Badge variant="outline" className="ml-auto mr-4 font-normal">Suggested</Badge>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <ul className="pl-2 space-y-2">
+                      {tasks.map((task, i) => task.trim().startsWith('- ') ? <li key={i} className="ml-4 list-disc text-muted-foreground">{task.substring(2)}</li> : null)}
+                    </ul>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
           </Accordion>
-          </>
-        )}
-      </div>
+        </>
+      )}
+    </div>
   );
 };
 
@@ -91,10 +92,11 @@ type StudyPlanPanelProps = {
 
 export function StudyPlanPanel({ student }: StudyPlanPanelProps) {
   const [studyPlan, setStudyPlan] = useState<GenerateStudyPlanOutput | null>(
-    null
+    student.studyPlan ? { studyPlan: student.studyPlan } : null
   );
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { updateStudent } = useStudentData();
 
   const handleGenerateStudyPlan = async () => {
     setIsLoading(true);
@@ -103,22 +105,22 @@ export function StudyPlanPanel({ student }: StudyPlanPanelProps) {
       description: "Crafting a personalized study schedule for you.",
     });
     try {
-       const subjectDataForPlan = (student.subjects || []).map(subject => {
-            const analysis = student.subjectAnalyses?.find(sa => sa.subjectId === subject.subjectId);
-            const averageMarkPercentage = ((subject.internalMark1 || 0) + (subject.internalMark2 || 0)) / 80 * 100;
-            const pendingAssignments = (subject.totalAssignments || 0) - (subject.completedAssignments || 0);
+      const subjectDataForPlan = (student.subjects || []).map(subject => {
+        const analysis = student.subjectAnalyses?.find(sa => sa.subjectId === subject.subjectId);
+        const averageMarkPercentage = ((subject.internalMark1 || 0) + (subject.internalMark2 || 0)) / 80 * 100;
+        const pendingAssignments = (subject.totalAssignments || 0) - (subject.completedAssignments || 0);
 
-            return {
-                subjectId: subject.subjectId,
-                subjectName: subject.subjectName,
-                riskLevel: analysis?.riskLevel || 'Medium',
-                outcome: analysis?.outcome || 'Pass',
-                gradeCategory: analysis?.gradeCategory || 'C',
-                averageMarkPercentage: averageMarkPercentage,
-                subjectAttendancePercentage: subject.subjectAttendancePercentage || 100,
-                pendingAssignments: pendingAssignments < 0 ? 0 : pendingAssignments,
-            };
-        });
+        return {
+          subjectId: subject.subjectId,
+          subjectName: subject.subjectName,
+          riskLevel: analysis?.riskLevel || 'Medium',
+          outcome: analysis?.outcome || 'Pass',
+          gradeCategory: analysis?.gradeCategory || 'C',
+          averageMarkPercentage: averageMarkPercentage,
+          subjectAttendancePercentage: subject.subjectAttendancePercentage || 100,
+          pendingAssignments: pendingAssignments < 0 ? 0 : pendingAssignments,
+        };
+      });
 
       const response = await fetch('/api/generate-study-plan', {
         method: 'POST',
@@ -144,6 +146,13 @@ export function StudyPlanPanel({ student }: StudyPlanPanelProps) {
 
       const result = await response.json();
       setStudyPlan(result);
+
+      // Persist the generated study plan to the central database/context
+      await updateStudent({
+        ...student,
+        studyPlan: result.studyPlan,
+      });
+
       toast({
         title: "Study Plan Generated",
         description: "Your new study plan is ready.",
@@ -162,14 +171,22 @@ export function StudyPlanPanel({ student }: StudyPlanPanelProps) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ScrollText className="w-6 h-6 text-primary" />
-          Personalized Study Plan
-        </CardTitle>
-        <CardDescription>
-          A custom 1-week plan to help you achieve your academic goals.
-        </CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 pr-6">
+        <div className="space-y-1">
+          <CardTitle className="flex items-center gap-2">
+            <ScrollText className="w-6 h-6 text-primary" />
+            Personalized Study Plan
+          </CardTitle>
+          <CardDescription>
+            A custom 1-week plan to help you achieve your academic goals.
+          </CardDescription>
+        </div>
+        {studyPlan && !isLoading && (
+          <Button variant="outline" size="sm" onClick={handleGenerateStudyPlan}>
+            <RefreshCw className="mr-2 h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Regenerate</span>
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {!studyPlan && !isLoading ? (

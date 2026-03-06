@@ -8,7 +8,6 @@
  * - PersonalizedRecommendationsOutput - The return type for the generatePersonalizedRecommendations function.
  */
 
-import { openrouter, MODEL } from '@/ai/genkit';
 import { z } from 'zod';
 
 const SubjectAnalysisSchema = z.object({
@@ -49,51 +48,74 @@ export type PersonalizedRecommendationsOutput = z.infer<typeof PersonalizedRecom
 export async function generatePersonalizedRecommendations(
   input: PersonalizedRecommendationsInput
 ): Promise<PersonalizedRecommendationsOutput> {
-  let subjectSection = '';
-  if (input.subjectAnalyses && input.subjectAnalyses.length > 0) {
-    subjectSection = `
-  **Part 2: Subject-Specific Recommendations**
-  Now, analyze the performance for each subject and provide a specific, actionable recommendation for each one. The recommendation should be a concise paragraph (about 40-60 words) tailored to the subject's specific risk level, grade, and attendance.
 
-  Subject-Wise Data:
-${input.subjectAnalyses.map(s => `  - Subject: ${s.subjectName}
-    - Risk Level: ${s.riskLevel}
-    - Predicted Grade: ${s.gradeCategory}
-    - Attendance: ${s.subjectAttendancePercentage ?? 0}%`).join('\n')}
-  
-  For each subject, generate a recommendation. For high-risk subjects, suggest revision strategies, practice, or mentoring. For subjects with low attendance, specifically mention the need to improve it, even if the marks are good. For medium-risk, suggest improvement areas. For low-risk, suggest advanced topics or challenges.
-
-  Include a "subjectRecommendations" array in the output with objects containing "subjectId", "subjectName", and "recommendation" for each subject.`;
+  // Deterministic Academic Recommendations
+  let academic = "";
+  if (input.riskLevel === 'High') {
+    academic = "Critical: Immediate focus is required on core topics. Revise foundational materials and actively practice previous exam questions to improve internal assessment scores.";
+  } else if (input.riskLevel === 'Medium') {
+    academic = "Focus on consistent revision and targeted practice in areas where marks dropped. Engaging with active studying techniques will help elevate your grade category.";
+  } else {
+    academic = "Maintain your current excellent academic strategies. Consider exploring advanced topics or peer-tutoring to deepen your mastery of the material.";
   }
 
-  const prompt = `You are an AI-powered academic advisor. Your task is to generate personalized recommendations for a student based on their overall performance and subject-specific analysis.
+  if (input.pendingAssignments > 0) {
+    academic += ` Make sure to complete your ${input.pendingAssignments} pending assignment(s) as soon as possible to secure internal marks.`;
+  }
 
-  **Part 1: Overall Recommendations**
-  Based on the student's overall data, provide tailored recommendations in three categories: Academic, Behavioral, and Intervention. For each category, provide a single, well-written paragraph of about 50-75 words.
+  // Deterministic Behavioral Recommendations
+  let behavioral = "";
+  if (input.attendancePercentage < 80) {
+    behavioral = "Attendance is a significant concern. Increase class attendance immediately to ensure a consistent understanding of the course material and avoid missing critical lectures.";
+  } else if (input.attendancePercentage < 90) {
+    behavioral = "Your attendance is satisfactory but has room for improvement. Try to minimize absences to stay fully synchronized with the course schedule.";
+  } else {
+    behavioral = "Excellent attendance record. Continue this strong habit of regular participation, as it directly correlates with your high performance.";
+  }
 
-  Overall Student Data:
-  - Risk Level: ${input.riskLevel}
-  - Predicted Outcome: ${input.outcome}
-  - Predicted Grade Category: ${input.gradeCategory}
-  - Academic Performance Summary: ${input.academicPerformance}
-  - Overall Attendance: ${input.attendancePercentage}%
-  - Assignment Completion: ${input.assignmentCompletionPercentage}%
-  - Pending Assignments: ${input.pendingAssignments}
+  if (input.assignmentCompletionPercentage < 75) {
+    behavioral += " Additionally, build a better daily routine to improve your overall assignment completion rate.";
+  }
 
-  ${subjectSection}
-  
-  **Output Format**
-  Generate a single JSON object with these fields: "academicRecommendations", "behavioralRecommendations", "interventionRecommendations"${input.subjectAnalyses ? ', and "subjectRecommendations" (array of {subjectId, subjectName, recommendation})' : ''}.
-  
-  Return ONLY valid JSON.`;
+  // Deterministic Intervention Recommendations
+  let intervention = "";
+  if (input.riskLevel === 'High' || input.outcome === 'Fail') {
+    intervention = "Mandatory intervention: Schedule an immediate mentoring session with your academic advisor. A structured remediation plan and regular check-ins are highly recommended.";
+  } else if (input.riskLevel === 'Medium') {
+    intervention = "Recommended intervention: Consider scheduling a meeting with subject teachers for classes where you are struggling. Joining a study group could also be beneficial.";
+  } else {
+    intervention = "No serious interventions needed. Keep up the open communication with your instructors to maintain your trajectory.";
+  }
 
-  const completion = await openrouter.chat.completions.create({
-    model: MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    response_format: { type: 'json_object' },
-  });
+  // Deterministic Subject Recommendations
+  const subjectRecommendations: { subjectId: string, subjectName: string, recommendation: string }[] = [];
+  if (input.subjectAnalyses) {
+    for (const sub of input.subjectAnalyses) {
+      let subRec = "";
+      if (sub.riskLevel === 'High') {
+        subRec = `Urgent attention needed for ${sub.subjectName}. Revisit the core syllabus and seek extra help from the instructor.`;
+      } else if (sub.riskLevel === 'Medium') {
+        subRec = `Performance in ${sub.subjectName} is average. Focus on weak topics and complete all upcoming assignments to boost your grade.`;
+      } else {
+        subRec = `Strong performance in ${sub.subjectName}. Continue your current study methods and aim for full marks in upcoming evaluations.`;
+      }
 
-  const content = completion.choices[0]?.message?.content || '{}';
-  const parsed = JSON.parse(content);
-  return PersonalizedRecommendationsOutputSchema.parse(parsed);
+      if ((sub.subjectAttendancePercentage ?? 100) < 80) {
+        subRec += ` Also, strictly improve your attendance in this specific class.`;
+      }
+
+      subjectRecommendations.push({
+        subjectId: sub.subjectId,
+        subjectName: sub.subjectName,
+        recommendation: subRec
+      });
+    }
+  }
+
+  return {
+    academicRecommendations: academic,
+    behavioralRecommendations: behavioral,
+    interventionRecommendations: intervention,
+    subjectRecommendations: subjectRecommendations.length > 0 ? subjectRecommendations : undefined,
+  };
 }

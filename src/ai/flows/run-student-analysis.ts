@@ -73,7 +73,7 @@ export async function runStudentAnalysis(
   // 1. Call the Local FastAPI Machine Learning Prediction Service
   let mlPrediction;
   try {
-    const response = await fetch("http://localhost:8000/predict", {
+    const response = await fetch("http://localhost:8000/predict-student-analysis", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -82,6 +82,7 @@ def assign_grade(gpa, avg_mark, risk_level):
 
 
 @app.post("/predict")
+@app.post("/predict-student-analysis")
 async def predict_risk(student: StudentFeatures):
     if not model or not encoder:
         raise HTTPException(status_code=500, detail="Machine Learning model is not loaded on the server.")

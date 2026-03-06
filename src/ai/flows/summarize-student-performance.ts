@@ -8,7 +8,6 @@
  * - SummarizeStudentPerformanceOutput - The return type for the summarizeStudentPerformance function.
  */
 
-import { openrouter, MODEL } from '@/ai/genkit';
 import { z } from 'zod';
 
 const SummarizeStudentPerformanceInputSchema = z.object({
@@ -45,31 +44,44 @@ export type SummarizeStudentPerformanceOutput = z.infer<typeof SummarizeStudentP
 export async function summarizeStudentPerformance(
   input: SummarizeStudentPerformanceInput
 ): Promise<SummarizeStudentPerformanceOutput> {
-  const prompt = `Summarize the overall performance of student ${input.name} based on the following metrics and AI predictions:
 
-GPA: ${input.gpa}
-Internal Mark 1: ${input.internalMark1}
-Internal Mark 2: ${input.internalMark2}
-Average Mark Percentage: ${input.averageMarkPercentage}
-Attendance Percentage: ${input.attendancePercentage}
-Assignment Completion Percentage: ${input.assignmentCompletionPercentage}
-Pending Assignments: ${input.pendingAssignments}
-Risk Level: ${input.riskLevel}
-Outcome: ${input.outcome}
-Grade Category: ${input.gradeCategory}
-Confidence/Risk Probability: ${input.confidenceOrRiskProbability}
+  // Deterministic Summary Generation
 
-Provide a concise summary (around 50-75 words) highlighting key strengths, weaknesses, and potential areas of concern.
+  // 1. Performance Qualifier
+  let perfDesc = "moderate";
+  if (input.gpa >= 8 && input.averageMarkPercentage >= 80) perfDesc = "strong";
+  else if (input.gpa < 6.5 || input.averageMarkPercentage < 60) perfDesc = "concerning";
 
-Return ONLY a JSON object with this exact format: { "summary": "..." }`;
+  // 2. Engagement Qualifier
+  let engageDesc = "reasonably consistent";
+  if (input.attendancePercentage >= 90 && input.assignmentCompletionPercentage >= 85) engageDesc = "highly commendable";
+  else if (input.attendancePercentage < 80 || input.assignmentCompletionPercentage < 70) engageDesc = "requiring immediate improvement";
 
-  const completion = await openrouter.chat.completions.create({
-    model: MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    response_format: { type: 'json_object' },
-  });
+  // 3. Construct base sentences
+  let sentence1 = `${input.name} demonstrates ${perfDesc} academic performance with a GPA of ${input.gpa} and an average mark of ${input.averageMarkPercentage}%.`;
 
-  const content = completion.choices[0]?.message?.content || '{}';
-  const parsed = JSON.parse(content);
-  return SummarizeStudentPerformanceOutputSchema.parse(parsed);
+  let sentence2 = `Attendance (${input.attendancePercentage}%) and assignment completion (${input.assignmentCompletionPercentage}%) are ${engageDesc}.`;
+  if (input.pendingAssignments > 0) {
+    sentence2 += ` There are currently ${input.pendingAssignments} pending assignment(s).`;
+  } else {
+    sentence2 += ` All assignments have been submitted.`;
+  }
+
+  // 4. Prediction Assessment
+  let sentence3 = `Currently categorized as ${input.riskLevel.toLowerCase()} risk, the student is expected to ${input.outcome.toLowerCase()} with a grade of ${input.gradeCategory}.`;
+
+  // 5. Actionable Closure
+  let sentence4 = "Maintaining current habits will ensure continued stability.";
+  if (input.riskLevel.toLowerCase() === 'high' || input.outcome.toLowerCase() === 'fail') {
+    sentence4 = "Immediate intervention, focused revision, and consistent attendance are critical to improve outcomes.";
+  } else if (input.riskLevel.toLowerCase() === 'medium') {
+    sentence4 = "Strengthening assignment consistency and addressing weak subjects could further improve academic outcomes.";
+  } else {
+    sentence4 = "Continuing to engage with advanced materials and maintaining high attendance will support top-tier scores.";
+  }
+
+  // Combine paragraph (approx 50-75 words)
+  const summary = `${sentence1} ${sentence2} ${sentence3} ${sentence4}`;
+
+  return SummarizeStudentPerformanceOutputSchema.parse({ summary });
 }
