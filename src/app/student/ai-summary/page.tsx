@@ -3,7 +3,7 @@
 import { useStudentData } from "@/context/student-data-provider";
 import { useUser } from "@/firebase/auth/use-user";
 import { StudyPlanPanel } from "./components/study-plan-panel";
-import { AIRecommendationsPanel } from "./components/ai-recommendations-panel";
+import { Recommendations } from "../dashboard/components/recommendations";
 import { Loader2, AlertTriangle, Clock, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Student } from "@/lib/data";
@@ -125,7 +125,7 @@ export default function AISummaryPage() {
       <div className="grid gap-4 md:gap-8 grid-cols-1 lg:grid-cols-2 auto-rows-min">
         <div className="flex flex-col gap-4 md:gap-8">
           <AIPredictionPanel predictionData={student} isLoading={false} />
-          <AIRecommendationsPanel recommendationsData={student} isLoading={isUserLoading} />
+          <Recommendations student={student} />
         </div>
         <StudyPlanPanel student={student} />
       </div>

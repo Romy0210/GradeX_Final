@@ -53,8 +53,12 @@ export default function AtRiskPreview({ data }: AtRiskPreviewProps) {
           highRiskStudents.map((student) => {
             let profileImageUrl = undefined;
             if (student.profilePhoto) {
-              const photo = placeholderImages.find(p => p.id === student.profilePhoto);
-              if (photo?.imageUrl) profileImageUrl = photo.imageUrl;
+              if (student.profilePhoto.startsWith('http')) {
+                profileImageUrl = student.profilePhoto;
+              } else {
+                const photo = placeholderImages.find(p => p.id === student.profilePhoto);
+                if (photo?.imageUrl) profileImageUrl = photo.imageUrl;
+              }
             }
             if (!profileImageUrl) {
                profileImageUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(student.name)}&backgroundColor=0284c7&textColor=ffffff`;

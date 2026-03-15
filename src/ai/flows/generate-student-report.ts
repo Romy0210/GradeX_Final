@@ -59,7 +59,7 @@ const PersonalizedRecommendationsOutputSchema = z.object({
   academicRecommendations: z.string().describe('A paragraph of AI-driven academic recommendations for the student.'),
   behavioralRecommendations: z.string().describe('A paragraph of AI-driven behavioral recommendations for the student.'),
   interventionRecommendations: z.string().describe('A paragraph of risk-based intervention recommendations for the student.'),
-  subjectRecommendations: z.array(SubjectRecommendationSchema).optional(),
+  subjectRecommendations: z.array(SubjectRecommendationSchema),
 });
 
 

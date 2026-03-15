@@ -36,13 +36,28 @@ const RenderStudyPlan = ({ plan }: { plan: string }) => {
 
   const renderMarkdownSection = (text: string) => {
     return text.split('\n').map((line, i) => {
-      if (line.startsWith('# ')) return <h1 key={i} className="text-xl font-bold mt-4 mb-2">{line.substring(2)}</h1>;
-      if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-semibold mt-3 mb-1">{line.substring(3)}</h2>;
-      if (line.startsWith('### ')) return <h3 key={i} className="text-md font-medium mt-2">{line.substring(4)}</h3>;
-      if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-bold my-1">{line.substring(2, line.length - 2)}</p>
-      if (line.startsWith('* ') || line.startsWith('- ')) return <li key={i} className="ml-4 list-disc text-muted-foreground">{line.substring(2)}</li>;
-      if (line.trim() === '') return null;
-      return <p key={i} className="text-muted-foreground my-1">{line}</p>;
+      // Clean up stray hashes that might be returned by the AI
+      const cleanLine = line.replace(/^#$/, '').trim();
+      if (!cleanLine) return null;
+
+      if (cleanLine.startsWith('# ')) return <h1 key={i} className="text-xl font-bold mt-4 mb-2">{cleanLine.substring(2)}</h1>;
+      if (cleanLine.startsWith('## ')) return <h2 key={i} className="text-lg font-semibold mt-3 mb-1">{cleanLine.substring(3)}</h2>;
+      if (cleanLine.startsWith('### ')) return <h3 key={i} className="text-md font-medium mt-2">{cleanLine.substring(4)}</h3>;
+      if (cleanLine.startsWith('* ') || cleanLine.startsWith('- ')) return <li key={i} className="ml-4 list-disc text-muted-foreground">{cleanLine.substring(2).replace(/\*\*(.*?)\*\*/g, '$1')}</li>;
+      
+      // Handle inline bolding for standard paragraphs using regex replacement
+      const parts = cleanLine.split(/(\*\*.*?\*\*)/g);
+      
+      return (
+        <p key={i} className="text-muted-foreground my-1">
+          {parts.map((part, j) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              return <strong key={j} className="text-foreground">{part.substring(2, part.length - 2)}</strong>;
+            }
+            return part;
+          })}
+        </p>
+      );
     });
   }
 

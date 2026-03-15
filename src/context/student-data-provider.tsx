@@ -211,6 +211,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
       await setDoc(doc(firestore, "students", updatedStudent.id), updatedStudent, { merge: true });
     } catch (error) {
       console.error("Error updating student:", error);
+      throw error;
     }
   }, [firestore]);
 

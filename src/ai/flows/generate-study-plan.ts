@@ -9,6 +9,19 @@
  */
 
 import { z } from 'zod';
+import OpenAI from 'openai';
+import { zodResponseFormat } from "openai/helpers/zod";
+
+const openrouter = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY!,
+  defaultHeaders: {
+    'HTTP-Referer': 'https://gradex.pro',
+    'X-Title': 'GradeX',
+  },
+});
+
+const MODEL = 'arcee-ai/trinity-large-preview:free';
 
 const SubjectPerformanceSchema = z.object({
   subjectId: z.string(),
@@ -34,132 +47,68 @@ const GenerateStudyPlanInputSchema = z.object({
 export type GenerateStudyPlanInput = z.infer<typeof GenerateStudyPlanInputSchema>;
 
 const GenerateStudyPlanOutputSchema = z.object({
-  studyPlan: z.string().describe('A detailed, personalized 1-week study plan in Markdown format.'),
+  studyPlan: z.string().describe('A detailed, highly personalized 1-week study schedule rendered in beautifully formatted Markdown.'),
 });
 export type GenerateStudyPlanOutput = z.infer<typeof GenerateStudyPlanOutputSchema>;
 
 export async function generateStudyPlan(
   input: GenerateStudyPlanInput
 ): Promise<GenerateStudyPlanOutput> {
-  // 1. Sort subjects by risk level (High > Medium > Low) then by performance
-  const riskOrder: Record<string, number> = { 'High': 1, 'Medium': 2, 'Low': 3 };
-  const sortedSubjects = [...input.subjects].sort((a, b) => {
-    if (riskOrder[a.riskLevel] !== riskOrder[b.riskLevel]) {
-      return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
-    }
-    if (a.averageMarkPercentage !== b.averageMarkPercentage) {
-      return a.averageMarkPercentage - b.averageMarkPercentage; // Ascending: lowest marks first
-    }
-    return b.pendingAssignments - a.pendingAssignments; // Descending: highest pending assignments first
-  });
 
-  const highRiskSubjects = sortedSubjects.filter(s => s.riskLevel === 'High');
-  const mediumRiskSubjects = sortedSubjects.filter(s => s.riskLevel === 'Medium');
-  const lowRiskSubjects = sortedSubjects.filter(s => s.riskLevel === 'Low');
+  // For privacy, strip the student's real name before sending
+  const anonymizedData = {
+    gpa: input.gpa,
+    pendingAssignments: input.pendingAssignments,
+    attendancePercentage: input.attendancePercentage,
+    overallAverageMarkPercentage: input.overallAverageMarkPercentage,
+    riskLevel: input.riskLevel,
+    subjects: input.subjects.map(s => ({
+      name: s.subjectName,
+      risk: s.riskLevel,
+      grade: s.gradeCategory,
+      marks: s.averageMarkPercentage,
+      attendance: s.subjectAttendancePercentage,
+      pendingTasks: s.pendingAssignments
+    }))
+  };
 
-  const subjectsToFocus = [...highRiskSubjects, ...mediumRiskSubjects];
-
-  // --- PART 1: INTRODUCTORY ANALYSIS ---
-
-  // # Performance Diagnosis
-  let performanceAdjective = "moderate";
-  if (input.gpa >= 8.0) performanceAdjective = "strong";
-  else if (input.gpa < 6.5) performanceAdjective = "concerning";
-
-  let specificConcerns = "";
-  if (highRiskSubjects.length > 0) {
-    const names = highRiskSubjects.map(s => s.subjectName).join(" and ");
-    specificConcerns = ` Specifically, performance in ${names} requires immediate attention.`;
-  } else if (input.pendingAssignments > 0 || input.attendancePercentage < 85) {
-    specificConcerns = ` While subject grades are stable, ${input.pendingAssignments > 0 ? "pending assignments" : ""} ${input.pendingAssignments > 0 && input.attendancePercentage < 85 ? "and" : ""} ${input.attendancePercentage < 85 ? "lower attendance" : ""} are impacting your overall stability.`;
-  }
-
-  const performanceDiagnosis = `# Performance Diagnosis\n\n${input.name} is currently performing at a ${performanceAdjective} academic level with a GPA of ${input.gpa} and an average mark of ${input.overallAverageMarkPercentage}%.${specificConcerns} You are categorized as ${input.riskLevel} risk. Addressing these gaps early using this targeted 1-week plan can significantly improve your academic stability.`;
-
-  // # Subject-Specific Recovery Plan
-  let recoveryPlan = "\n\n# Subject-Specific Recovery Plan\n\n";
-  if (subjectsToFocus.length > 0) {
-    subjectsToFocus.forEach(sub => {
-      recoveryPlan += `## ${sub.subjectName} (${sub.riskLevel} Risk)\n`;
-      recoveryPlan += `**Improvement Strategy:** Dedicate focused blocks to review core concepts, clear any backlog, and practice past problems.\n`;
-      recoveryPlan += `**Micro Tasks:**\n`;
-      recoveryPlan += `- Review latest lecture notes to identify immediate knowledge gaps.\n`;
-      recoveryPlan += `- Solve 3-5 practice problems related to recent topics.\n`;
-      if (sub.pendingAssignments > 0) {
-        recoveryPlan += `- Complete ${sub.pendingAssignments} pending assignment(s) for ${sub.subjectName}.\n`;
-      }
-      recoveryPlan += `- Revise key concepts from the syllabus.\n\n`;
+  try {
+    const response = await openrouter.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert AI academic tutor. Generate a highly personalized 1-week study schedule (Monday-Sunday) in elegant Markdown format based on this student's statistical profile.`
+        },
+        {
+          role: "user",
+          content: `Student Profile:\n${JSON.stringify(anonymizedData, null, 2)}\n\nRequirements for the Markdown Study Plan:\n1. Start with a "Performance Diagnosis" paragraph.\n2. Include a "Subject-Specific Recovery Plan" for any subjects marked "Medium" or "High" risk.\n3. Include an "Assignment Completion Plan" if there are pending tasks.\n4. Detail the actual "Weekly Schedule" (Monday-Sunday) breaking down exact focus blocks (e.g. 45 mins).\n5. End with a "GPA Recovery Projection" paragraph.\n\nUse the word "You" to address the student directly. Make it actionable, supportive, and mathematically grounded in the provided metrics. Do NOT use any real names. Return ONLY a valid JSON object matching the requested schema.`
+        }
+      ],
+      response_format: zodResponseFormat(GenerateStudyPlanOutputSchema, "study_plan"),
+      temperature: 0.7,
     });
-  } else {
-    recoveryPlan += `Excellent work! You have no high or medium risk subjects. Keep utilizing your current study techniques to maintain your strong performance.\n\n`;
-  }
 
-  // # Assignment Completion Plan
-  let assignmentPlan = "\n# Assignment Completion Plan\n\n";
-  if (input.pendingAssignments > 0) {
-    assignmentPlan += `You have **${input.pendingAssignments}** pending assignments. Strategy:\n`;
-    assignmentPlan += `- Prioritize assignments for high-risk subjects first.\n`;
-    assignmentPlan += `- Break down larger assignments into smaller, 30-minute tasks.\n`;
-    assignmentPlan += `- Aim to complete at least one assignment every one or two days based on deadlines.\n`;
-  } else {
-    assignmentPlan += `Great job! You have 0 pending assignments. Continue submitting future assignments on time.\n`;
-  }
-
-  // # Attendance Recovery Plan
-  let attendancePlan = "";
-  if (input.attendancePercentage < 85) {
-    attendancePlan = `\n# Attendance Recovery Plan\n\nYour attendance is currently at **${input.attendancePercentage}%**, which is below optimal levels.\n`;
-    attendancePlan += `- Attend all upcoming lectures without fail.\n`;
-    attendancePlan += `- Request notes from peers for any missed sessions.\n`;
-    attendancePlan += `- Participate actively in class discussions to rebuild engagement.\n`;
-  }
-
-  // # GPA Recovery Projection
-  let possibleNewGPA = Math.min((input.gpa + 0.5), 10).toFixed(1);
-  let possibleNewRisk = input.riskLevel === 'High' ? 'Medium' : 'Low';
-
-  let gpaProjection = `\n# GPA Recovery Projection\n\nFollowing this study plan consistently can gradually improve academic performance. Maintaining consistent study sessions and improving attendance may help raise your GPA from **${input.gpa}** to a stronger range (potentially ~${possibleNewGPA}) while lowering your academic risk level to **${possibleNewRisk}**.`;
-
-
-  // --- PART 2: WEEKLY SCHEDULE ---
-
-  let schedule = "\n\n# Weekly Study Schedule\n\n";
-
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-  // Distribute focus subjects
-  days.forEach((day, index) => {
-    // Pick a subject to focus on (round-robin through sorted subjects)
-    const focusSubject = sortedSubjects.length > 0 ? sortedSubjects[index % sortedSubjects.length] : null;
-
-    schedule += `### ${day}\n`;
-    if (focusSubject) {
-      schedule += `- **Study ${focusSubject.subjectName}:** Review lecture notes and core concepts for 45 minutes.\n`;
-      if (focusSubject.pendingAssignments > 0) {
-        schedule += `- Complete 1 pending assignment for ${focusSubject.subjectName}.\n`;
-      } else {
-        schedule += `- Solve practice problems or revise previous internal exam mistakes.\n`;
-      }
+    const outputContent = response.choices[0]?.message?.content;
+    if (outputContent) {
+      const parsedOutput = JSON.parse(outputContent) as GenerateStudyPlanOutput;
+      
+      // Re-inject the student's real name locally
+      let customizedMarkdown = parsedOutput.studyPlan;
+      customizedMarkdown = customizedMarkdown.replace(/# Performance Diagnosis\n\n(You|The student)/i, `# Performance Diagnosis\n\n${input.name}, you`);
+      
+      return { studyPlan: customizedMarkdown };
     } else {
-      schedule += `- Independent study session: Read ahead for upcoming lectures.\n`;
+      throw new Error("AI returned empty output");
     }
 
-    if (input.pendingAssignments > 0 && index % 2 === 0 && (!focusSubject || focusSubject.pendingAssignments === 0)) {
-      schedule += `- Spend 30 minutes working on other pending assignments.\n`;
-    }
-
-    schedule += `- Take a short 15-minute break to recharge.\n\n`;
-  });
-
-  // Sunday
-  schedule += `### Sunday\n`;
-  schedule += `- **Light Revision:** Briefly review the topics covered this week (30 minutes max).\n`;
-  schedule += `- **Rest & Recover:** Take time off from heavy studying to relax and prepare for the upcoming week.\n`;
-
-
-  const fullMarkdown = `${performanceDiagnosis}${recoveryPlan}${assignmentPlan}${attendancePlan}${gpaProjection}${schedule}`;
-
-  return GenerateStudyPlanOutputSchema.parse({
-    studyPlan: fullMarkdown
-  });
+  } catch (error) {
+    console.error("Error generating Study Plan:", error);
+    
+    // Fallback deterministic logic 
+    const fallbackDaySchedule = `### Monday-Friday\n- 45m: Focus on High Risk Subjects\n- 30m: Complete pending assignments\n- 15m: Review notes for tomorrow\n\n### Weekend\n- Rest and complete larger projects.`;
+    return {
+      studyPlan: `# Performance Diagnosis\n\n${input.name}, you are currently at a ${input.riskLevel} risk level with a GPA of ${input.gpa}. Please focus on completing your ${input.pendingAssignments} pending assignments immediately.\n\n# Weekly Schedule\n\n${fallbackDaySchedule}`
+    };
+  }
 }

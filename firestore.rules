@@ -19,13 +19,9 @@ service cloud.firestore {
         // Admins have full read/write access to all student records.
         allow read, write: if isAdmin();
 
-        // A student can read their own data.
-        // The rule requires the document to have an 'email' field that matches the user's authenticated email.
-        // This is secure and allows the client query `where('email', '==', user.email)` to work.
-        allow read: if 'email' in resource.data && resource.data.email == request.auth.token.email;
-
-        // A student can update their own record (needed for profile edits).
-        allow update: if 'email' in resource.data && resource.data.email == request.auth.token.email;
+        // A student can read and update their own data.
+        // We match their exact authenticated UID against the `authUid` stored in the document.
+        allow read, update: if 'authUid' in resource.data && resource.data.authUid == request.auth.uid;
     }
 
     // Rules for app settings

@@ -9,6 +9,19 @@
  */
 
 import { z } from 'zod';
+import OpenAI from 'openai';
+import { zodResponseFormat } from "openai/helpers/zod";
+
+const openrouter = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY!,
+  defaultHeaders: {
+    'HTTP-Referer': 'https://gradex.pro',
+    'X-Title': 'GradeX',
+  },
+});
+
+const MODEL = 'arcee-ai/trinity-large-preview:free';
 
 const SubjectAnalysisSchema = z.object({
   subjectId: z.coerce.string(),
@@ -34,14 +47,14 @@ export type PersonalizedRecommendationsInput = z.infer<typeof PersonalizedRecomm
 const SubjectRecommendationSchema = z.object({
   subjectId: z.coerce.string(),
   subjectName: z.string(),
-  recommendation: z.string().describe('A paragraph of AI-driven recommendations specific to this subject.'),
+  recommendation: z.string().describe('A 1-2 sentence AI-driven recommendation specific to this subject based on the student stats.'),
 });
 
 const PersonalizedRecommendationsOutputSchema = z.object({
-  academicRecommendations: z.string().describe('A paragraph of AI-driven academic recommendations for the student.'),
-  behavioralRecommendations: z.string().describe('A paragraph of AI-driven behavioral recommendations for the student.'),
-  interventionRecommendations: z.string().describe('A paragraph of risk-based intervention recommendations for the student.'),
-  subjectRecommendations: z.array(SubjectRecommendationSchema).optional().describe('An array of subject-specific recommendations.'),
+  academicRecommendations: z.string().describe('Explain the "Reasoning" behind their academic risk and give "Actionable Steps" to fix it. Write in very simple, plain English without any academic jargon.'),
+  behavioralRecommendations: z.string().describe('Explain the "Reasoning" behind their attendance/assignments and give "Actionable Steps" to fix it. Write in very simple, plain English without any academic jargon.'),
+  interventionRecommendations: z.string().describe('Explain the "Reasoning" for needing help and give "Actionable Steps". Write in very simple, plain English without any academic jargon.'),
+  subjectRecommendations: z.array(SubjectRecommendationSchema).describe('An array of subject-specific recommendations. Return empty array if none.'),
 });
 export type PersonalizedRecommendationsOutput = z.infer<typeof PersonalizedRecommendationsOutputSchema>;
 
@@ -49,73 +62,71 @@ export async function generatePersonalizedRecommendations(
   input: PersonalizedRecommendationsInput
 ): Promise<PersonalizedRecommendationsOutput> {
 
-  // Deterministic Academic Recommendations
-  let academic = "";
-  if (input.riskLevel === 'High') {
-    academic = "Critical: Immediate focus is required on core topics. Revise foundational materials and actively practice previous exam questions to improve internal assessment scores.";
-  } else if (input.riskLevel === 'Medium') {
-    academic = "Focus on consistent revision and targeted practice in areas where marks dropped. Engaging with active studying techniques will help elevate your grade category.";
-  } else {
-    academic = "Maintain your current excellent academic strategies. Consider exploring advanced topics or peer-tutoring to deepen your mastery of the material.";
-  }
+  // For privacy, we only send statistical data to the LLM, NO PII (No name, email, etc.)
+  const promptData = {
+    riskLevel: input.riskLevel,
+    outcome: input.outcome,
+    gradeCategory: input.gradeCategory,
+    attendancePercentage: input.attendancePercentage,
+    assignmentCompletionPercentage: input.assignmentCompletionPercentage,
+    pendingAssignments: input.pendingAssignments,
+    subjectAnalyses: input.subjectAnalyses?.map(s => ({
+      name: s.subjectName,
+      risk: s.riskLevel,
+      grade: s.gradeCategory,
+      attendance: s.subjectAttendancePercentage
+    }))
+  };
 
-  if (input.pendingAssignments > 0) {
-    academic += ` Make sure to complete your ${input.pendingAssignments} pending assignment(s) as soon as possible to secure internal marks.`;
-  }
+  try {
+    const response = await openrouter.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: "system",
+          content: `You are a helpful, extremely easy-to-understand academic advisor. 
+          Analyze the student metrics and provide personalized advice.
+          Keep the tone encouraging.
+          CRITICAL: You MUST write your response using very simple, plain English (8th-grade reading level). Avoid dense paragraphs, avoid academic jargon, and avoid complex vocabulary. Speak directly to the student.`
+        },
+        {
+          role: "user",
+          content: `Student Metrics:\n${JSON.stringify(promptData, null, 2)}
+          
+Strictly follow the JSON structure. 
+For Academic, Behavioral, and Intervention, use this exact format with basic words:
+1. **The 'Why':** Explain why this advice is needed using their numbers (e.g., "Because your attendance is only 75%...").
+2. **What to do now:** Give 2-3 clear, simple steps to fix it.
 
-  // Deterministic Behavioral Recommendations
-  let behavioral = "";
-  if (input.attendancePercentage < 80) {
-    behavioral = "Attendance is a significant concern. Increase class attendance immediately to ensure a consistent understanding of the course material and avoid missing critical lectures.";
-  } else if (input.attendancePercentage < 90) {
-    behavioral = "Your attendance is satisfactory but has room for improvement. Try to minimize absences to stay fully synchronized with the course schedule.";
-  } else {
-    behavioral = "Excellent attendance record. Continue this strong habit of regular participation, as it directly correlates with your high performance.";
-  }
+For subjectRecommendations, provide 1 very simple sentence.`
+        }
+      ],
+      response_format: zodResponseFormat(PersonalizedRecommendationsOutputSchema, "recommendations"),
+      temperature: 0.7,
+    });
 
-  if (input.assignmentCompletionPercentage < 75) {
-    behavioral += " Additionally, build a better daily routine to improve your overall assignment completion rate.";
-  }
+    const outputContent = response.choices[0]?.message?.content;
+    if (outputContent) {
+         // The OpenAI SDK with zodResponseFormat guarantees a stringified JSON matching the schema
+         const parsedOptions = JSON.parse(outputContent);
+         return parsedOptions as PersonalizedRecommendationsOutput;
+    } else {
+        throw new Error("AI returned empty output");
+    }
 
-  // Deterministic Intervention Recommendations
-  let intervention = "";
-  if (input.riskLevel === 'High' || input.outcome === 'Fail') {
-    intervention = "Mandatory intervention: Schedule an immediate mentoring session with your academic advisor. A structured remediation plan and regular check-ins are highly recommended.";
-  } else if (input.riskLevel === 'Medium') {
-    intervention = "Recommended intervention: Consider scheduling a meeting with subject teachers for classes where you are struggling. Joining a study group could also be beneficial.";
-  } else {
-    intervention = "No serious interventions needed. Keep up the open communication with your instructors to maintain your trajectory.";
-  }
-
-  // Deterministic Subject Recommendations
-  const subjectRecommendations: { subjectId: string, subjectName: string, recommendation: string }[] = [];
-  if (input.subjectAnalyses) {
-    for (const sub of input.subjectAnalyses) {
-      let subRec = "";
-      if (sub.riskLevel === 'High') {
-        subRec = `Urgent attention needed for ${sub.subjectName}. Revisit the core syllabus and seek extra help from the instructor.`;
-      } else if (sub.riskLevel === 'Medium') {
-        subRec = `Performance in ${sub.subjectName} is average. Focus on weak topics and complete all upcoming assignments to boost your grade.`;
-      } else {
-        subRec = `Strong performance in ${sub.subjectName}. Continue your current study methods and aim for full marks in upcoming evaluations.`;
-      }
-
-      if ((sub.subjectAttendancePercentage ?? 100) < 80) {
-        subRec += ` Also, strictly improve your attendance in this specific class.`;
-      }
-
-      subjectRecommendations.push({
+  } catch (error) {
+    console.error("Error generating AI recommendations:", error);
+    
+    // Fallback deterministic logic if API fails or key is missing
+    return {
+      academicRecommendations: "Based on the provided metrics, please review all core topics and prioritize completing pending assignments immediately.",
+      behavioralRecommendations: "Attendance and assignment completion are critical factors. Ensure you attend all upcoming classes.",
+      interventionRecommendations: input.riskLevel === 'High' ? "Mandatory intervention required. Meet with your advisor." : "Continue monitoring your progress.",
+      subjectRecommendations: input.subjectAnalyses?.map(sub => ({
         subjectId: sub.subjectId,
         subjectName: sub.subjectName,
-        recommendation: subRec
-      });
-    }
+        recommendation: `Focus on improving your understanding of ${sub.subjectName}.`
+      })) || []
+    };
   }
-
-  return {
-    academicRecommendations: academic,
-    behavioralRecommendations: behavioral,
-    interventionRecommendations: intervention,
-    subjectRecommendations: subjectRecommendations.length > 0 ? subjectRecommendations : undefined,
-  };
 }

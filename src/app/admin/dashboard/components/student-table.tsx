@@ -143,8 +143,12 @@ export function StudentTable({
           {data.map((student) => {
             let profileImageUrl = undefined;
             if (student.profilePhoto) {
-               const photo = PlaceHolderImages.find(p => p.id === student.profilePhoto);
-               if (photo?.imageUrl) profileImageUrl = photo.imageUrl;
+               if (student.profilePhoto.startsWith('http')) {
+                 profileImageUrl = student.profilePhoto;
+               } else {
+                 const photo = PlaceHolderImages.find(p => p.id === student.profilePhoto);
+                 if (photo?.imageUrl) profileImageUrl = photo.imageUrl;
+               }
             }
             // Use an algorithmic DiceBear avatar if no explicit profile photo URL exists
             if (!profileImageUrl) {

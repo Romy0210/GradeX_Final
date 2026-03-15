@@ -13,9 +13,9 @@ import { Loader2, Camera, User, Mail, Landmark, Phone, Calendar, GitBranch, KeyR
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { getAuth, updateProfile, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useFirestore, useFirebaseApp } from '@/firebase';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useFirestore, useFirebaseApp, useStorage } from '@/firebase';
 import { useState, useEffect, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,6 +50,7 @@ export default function StudentProfilePage() {
 
   const app = useFirebaseApp();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
@@ -97,29 +98,71 @@ export default function StudentProfilePage() {
     }
   }, [studentData, form]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (!['image/jpeg', 'image/png'].includes(file.type)) {
-        toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload a JPG or PNG image.' });
-        return;
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload a JPG or PNG image.' });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size cannot exceed 2MB.' });
+      return;
+    }
+
+    if (!user || !firestore || !app || !storage || !studentData) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Services not ready. Please try again.' });
+      return;
+    }
+
+    // Show local preview immediately
+    setImagePreview(URL.createObjectURL(file));
+    setIsUploadingPhoto(true);
+    toast({ title: 'Uploading photo...', description: 'Your profile picture is being saved.' });
+
+    try {
+      const auth = getAuth(app);
+
+      // Upload to Firebase Storage using the initialized storage instance
+      const fileRef = storageRef(storage, `avatars/${user.uid}`);
+      const snapshot = await uploadBytes(fileRef, file);
+      const newPhotoURL = await getDownloadURL(snapshot.ref);
+
+      // Update Firebase Auth
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { photoURL: newPhotoURL });
       }
-      if (file.size > 2 * 1024 * 1024) { // 2MB
-        toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size cannot exceed 2MB.' });
-        return;
-      }
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
+
+      // Update users collection (for avatar preview on profile page)
+      const userDocRef = doc(firestore, 'users', user.uid);
+      await setDoc(userDocRef, { photoURL: newPhotoURL }, { merge: true });
+
+      // Update students collection (for dashboard avatar)
+      const studentDocRef = doc(firestore, 'students', studentData.id);
+      await updateDoc(studentDocRef, { profilePhoto: newPhotoURL });
+
+      setImagePreview(newPhotoURL);
+      toast({ title: 'Profile photo saved!', description: 'Your new profile picture is live.' });
+    } catch (error: any) {
+      console.error('Photo upload error:', error);
+      setImagePreview(null);
+      toast({ variant: 'destructive', title: 'Upload Failed', description: error.message || 'Check browser console for details.' });
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const resetImageSelection = () => {
-    setImageFile(null);
     setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   }
+
 
   async function onSubmit(data: ProfileFormValues) {
     if (!user || !firestore || !app || !studentData) {
@@ -131,39 +174,26 @@ export default function StudentProfilePage() {
 
     try {
       const auth = getAuth(app);
-      const storage = getStorage(app);
 
-      const hasPhotoChanged = imageFile !== null;
-
-      if (!isDirty && !hasPhotoChanged) {
+      if (!isDirty) {
         toast({ title: "No changes to save." });
         setIsSaving(false);
         return;
       }
 
-      const authUpdates: { displayName?: string; photoURL?: string } = {};
+      const authUpdates: { displayName?: string } = {};
       const firestoreUpdates: { [key: string]: any } = {};
 
-      if (hasPhotoChanged && imageFile) {
-        const fileRef = storageRef(storage, `avatars/${user.uid}`);
-        const snapshot = await uploadBytes(fileRef, imageFile);
-        const newPhotoURL = await getDownloadURL(snapshot.ref);
-        authUpdates.photoURL = newPhotoURL;
-        firestoreUpdates.photoURL = newPhotoURL;
+      if (data.name !== studentData.name) {
+        authUpdates.displayName = data.name;
       }
+      firestoreUpdates.displayName = data.name;
+      if (data.phone !== undefined) firestoreUpdates.phone = data.phone;
+      firestoreUpdates.age = data.age;
+      firestoreUpdates.gender = data.gender;
+      if (data.educationalBackground !== undefined) firestoreUpdates.educationalBackground = data.educationalBackground;
 
-      if (isDirty) {
-        if (data.name !== studentData.name) {
-          authUpdates.displayName = data.name;
-        }
-        firestoreUpdates.displayName = data.name;
-        firestoreUpdates.phone = data.phone;
-        firestoreUpdates.age = data.age;
-        firestoreUpdates.gender = data.gender;
-        firestoreUpdates.educationalBackground = data.educationalBackground;
-      }
-
-      // Update Firebase Auth
+      // Update Firebase Auth display name
       if (Object.keys(authUpdates).length > 0 && auth.currentUser) {
         await updateProfile(auth.currentUser, authUpdates);
       }
@@ -174,15 +204,17 @@ export default function StudentProfilePage() {
         await setDoc(userDocRef, firestoreUpdates, { merge: true });
       }
 
-      // Update student data in local state/storage to keep UI in sync
-      updateStudent({
-        ...studentData,
-        ...data,
+      // Update students collection with only the changed fields
+      const studentDocRef = doc(firestore, 'students', studentData.id);
+      await updateDoc(studentDocRef, {
+        name: data.name,
+        ...(data.phone !== undefined && { phone: data.phone }),
+        age: data.age,
+        gender: data.gender,
+        ...(data.educationalBackground !== undefined && { educationalBackground: data.educationalBackground }),
       });
 
-
       toast({ title: "Profile updated successfully" });
-      resetImageSelection();
       form.reset(data, { keepDirty: false });
 
     } catch (error: any) {
@@ -281,7 +313,13 @@ export default function StudentProfilePage() {
                   <AvatarImage src={imagePreview ?? userProfile?.photoURL ?? user?.photoURL ?? undefined} />
                   <AvatarFallback>{studentData.name?.[0] || 'S'}</AvatarFallback>
                 </Avatar>
-                <span className="absolute bottom-1 right-1 block h-4 w-4 rounded-full bg-green-500 ring-2 ring-card" />
+                {isUploadingPhoto ? (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                  </div>
+                ) : (
+                  <span className="absolute bottom-1 right-1 block h-4 w-4 rounded-full bg-green-500 ring-2 ring-card" />
+                )}
               </div>
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-2xl font-bold">{form.watch('name')}</h2>

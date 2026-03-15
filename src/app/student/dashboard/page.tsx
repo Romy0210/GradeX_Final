@@ -51,7 +51,20 @@ export default function StudentDashboard() {
     );
   }
 
-  const profilePhoto = PlaceHolderImages.find(p => p.id === student.profilePhoto);
+  // Resolve profilePhoto: if it's an http URL use directly, if it's a known
+  // placeholder ID resolve it, otherwise fall back to undefined (shows initials)
+  let finalProfilePhotoUrl: string | undefined = undefined;
+  if (student.profilePhoto) {
+    if (student.profilePhoto.startsWith('http')) {
+      finalProfilePhotoUrl = student.profilePhoto;
+    } else {
+      const placeholder = PlaceHolderImages.find(p => p.id === student.profilePhoto);
+      if (placeholder) {
+        finalProfilePhotoUrl = placeholder.imageUrl;
+      }
+      // If no matching placeholder found, leave undefined → AvatarFallback shows
+    }
+  }
 
   return (
     <>
@@ -66,7 +79,7 @@ export default function StudentDashboard() {
         </div>
         <div className="flex items-center gap-4">
           <Avatar className="h-14 w-14">
-            <AvatarImage src={profilePhoto?.imageUrl} alt={student.name} />
+            <AvatarImage src={finalProfilePhotoUrl} alt={student.name} />
             <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
           </Avatar>
         </div>
