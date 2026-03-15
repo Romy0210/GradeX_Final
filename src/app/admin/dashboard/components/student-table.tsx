@@ -141,9 +141,16 @@ export function StudentTable({
         </TableHeader>
         <TableBody>
           {data.map((student) => {
-            const profilePhoto = PlaceHolderImages.find(
-              (p) => p.id === student.profilePhoto
-            );
+            let profileImageUrl = undefined;
+            if (student.profilePhoto) {
+               const photo = PlaceHolderImages.find(p => p.id === student.profilePhoto);
+               if (photo?.imageUrl) profileImageUrl = photo.imageUrl;
+            }
+            // Use an algorithmic DiceBear avatar if no explicit profile photo URL exists
+            if (!profileImageUrl) {
+               profileImageUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(student.name)}&backgroundColor=0284c7&textColor=ffffff`;
+            }
+
             const isAnalyzingThisStudent = analyzingStudentId === student.id;
             const isExpanded = expandedRows.has(student.id);
 
@@ -158,7 +165,7 @@ export function StudentTable({
                       </Button>
                       <Avatar className="h-10 w-10">
                         <AvatarImage
-                          src={profilePhoto?.imageUrl}
+                          src={profileImageUrl}
                           alt={student.name}
                         />
                         <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>

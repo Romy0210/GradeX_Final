@@ -73,7 +73,7 @@ export async function runStudentAnalysis(
   // 1. Call the Local FastAPI Machine Learning Prediction Service
   let mlPrediction;
   try {
-    const response = await fetch("http://localhost:8000/predict-student-analysis", {
+    const response = await fetch("http://127.0.0.1:8000/predict-student-analysis", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -174,6 +174,22 @@ export async function runStudentAnalysis(
     gradeCategory: mlPrediction.gradeCategory,
     topFactors: mlPrediction.topFactors,
   };
+
+  // 4. Override with Subject Analysis Results
+  // If ANY subject has a 'High' risk level, the overall risk MUST be 'High'
+  const hasHighRiskSubject = subjectAnalyses.some(s => s.riskLevel === 'High');
+  if (hasHighRiskSubject) {
+    finalOutput.riskLevel = 'High';
+    finalOutput.outcome = 'Fail';
+    finalOutput.gradeCategory = 'F';
+    
+    const factorMsg = "High risk factor: Failing one or more individual subjects.";
+    if (finalOutput.topFactors && !finalOutput.topFactors.includes(factorMsg)) {
+      finalOutput.topFactors.push(factorMsg);
+    } else if (!finalOutput.topFactors) {
+      finalOutput.topFactors = [factorMsg];
+    }
+  }
 
   if (mlPrediction.outcome === 'Pass') {
     finalOutput.predictionConfidence = mlPrediction.probability;

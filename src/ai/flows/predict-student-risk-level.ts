@@ -29,7 +29,7 @@ export type PredictStudentRiskLevelOutput = z.infer<typeof PredictStudentRiskLev
 export async function predictStudentRiskLevel(
   input: PredictStudentRiskLevelInput
 ): Promise<PredictStudentRiskLevelOutput> {
-  const mlApiUrl = process.env.ML_API_URL || 'http://localhost:8000/predict';
+  const mlApiUrl = process.env.ML_API_URL || 'http://127.0.0.1:8000/predict';
 
   try {
     const response = await fetch(mlApiUrl, {

@@ -51,9 +51,15 @@ export default function AtRiskPreview({ data }: AtRiskPreviewProps) {
       <CardContent className="flex-grow space-y-2">
         {highRiskStudents.length > 0 ? (
           highRiskStudents.map((student) => {
-            const profilePhoto = placeholderImages.find(
-              (p) => p.id === student.profilePhoto
-            );
+            let profileImageUrl = undefined;
+            if (student.profilePhoto) {
+              const photo = placeholderImages.find(p => p.id === student.profilePhoto);
+              if (photo?.imageUrl) profileImageUrl = photo.imageUrl;
+            }
+            if (!profileImageUrl) {
+               profileImageUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(student.name)}&backgroundColor=0284c7&textColor=ffffff`;
+            }
+
             const highRiskSubjects =
               student.subjectAnalyses?.filter((s) => s.riskLevel === "High") ??
               [];
@@ -69,7 +75,7 @@ export default function AtRiskPreview({ data }: AtRiskPreviewProps) {
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
                       <AvatarImage
-                        src={profilePhoto?.imageUrl}
+                        src={profileImageUrl}
                         alt={student.name}
                       />
                       <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
