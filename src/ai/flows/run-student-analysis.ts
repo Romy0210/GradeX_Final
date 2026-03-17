@@ -118,11 +118,36 @@ export async function runStudentAnalysis(
     console.error("ML Prediction Error:", error);
     // Fallback if ML service is down or errors. 
     // This allows the app to continue functioning gracefully by falling back to deterministic rules if the server isn't running.
+    
+    // Calculate a deterministic fallback probability based on composite score signals
+    const compositeScore = (input.overallAverageMarkPercentage * 0.6) + (input.attendancePercentage * 0.2) + (input.assignmentCompletionPercentage * 0.2);
+    
+    let fallbackRisk: 'Low' | 'Medium' | 'High' = 'Medium';
+    let fallbackOutcome: 'Pass' | 'Fail' = 'Pass';
+    let fallbackGrade: 'S' | 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C' | 'D' | 'F' = 'C';
+    
+    if (compositeScore >= 90) { fallbackRisk = 'Low'; fallbackGrade = 'S'; }
+    else if (compositeScore >= 80) { fallbackRisk = 'Low'; fallbackGrade = 'A'; }
+    else if (compositeScore >= 70) { fallbackRisk = 'Medium'; fallbackGrade = 'B'; }
+    else if (compositeScore >= 60) { fallbackRisk = 'Medium'; fallbackGrade = 'C'; }
+    else if (compositeScore >= 45) { fallbackRisk = 'High'; fallbackGrade = 'D'; }
+    else { fallbackRisk = 'High'; fallbackOutcome = 'Fail'; fallbackGrade = 'F'; }
+
+    // Confidence Calculation for Fallback:
+    // We normalize the composite score relative to the threshold of the predicted category.
+    // For Pass, higher is better. For Fail, lower is worse (higher risk).
+    let confidence = 0;
+    if (fallbackOutcome === 'Pass') {
+      confidence = 70 + (compositeScore / 100) * 25; // Range 70-95%
+    } else {
+      confidence = 75 + ((45 - compositeScore) / 45) * 20; // Range 75-95%
+    }
+    
     mlPrediction = {
-      riskLevel: "Medium",
-      outcome: "Pass",
-      gradeCategory: "C",
-      probability: 0,
+      riskLevel: fallbackRisk,
+      outcome: fallbackOutcome,
+      gradeCategory: fallbackGrade,
+      probability: Math.min(98, Math.round(confidence)),
       topFactors: ["ML Service Unavailable - using fallback predictions."]
     };
   }
