@@ -52,8 +52,8 @@ const RunStudentAnalysisOutputSchema = z.object({
   riskLevel: z.enum(['Low', 'Medium', 'High']),
   outcome: z.enum(['Pass', 'Fail']),
   gradeCategory: z.enum(['S', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F']),
-  predictionConfidence: z.number().optional(),
-  failureRiskProbability: z.number().optional(),
+  predictionConfidence: z.number().nullable().optional(),
+  failureRiskProbability: z.number().nullable().optional(),
   subjectAnalyses: z.array(SubjectAnalysisOutputSchema).optional().describe("An array of AI analyses for each individual subject."),
   topFactors: z.array(z.string()).optional().describe("SHAP generated explanatory factors from the ML Model"),
 });
@@ -237,10 +237,15 @@ export async function runStudentAnalysis(
     }
   }
 
-  if (mlPrediction.outcome === 'Pass') {
-    finalOutput.predictionConfidence = mlPrediction.probability;
+  // 5. Assign probability based on the FINAL outcome
+  const finalProbability = mlPrediction.probability ?? 0;
+  
+  if (finalOutput.outcome === 'Pass') {
+    finalOutput.predictionConfidence = finalProbability;
+    (finalOutput as any).failureRiskProbability = null;
   } else {
-    finalOutput.failureRiskProbability = mlPrediction.probability;
+    finalOutput.failureRiskProbability = finalProbability;
+    (finalOutput as any).predictionConfidence = null;
   }
 
   if (subjectAnalyses.length > 0) {

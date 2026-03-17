@@ -75,8 +75,9 @@ const OverallPrediction = ({
   predictionData: PredictionData;
 }) => {
   const probability =
-    predictionData?.predictionConfidence ??
-    predictionData?.failureRiskProbability;
+    predictionData?.outcome === "Pass"
+      ? predictionData?.predictionConfidence
+      : predictionData?.failureRiskProbability;
   const probabilityLabel =
     predictionData?.outcome === "Pass"
       ? "Prediction Confidence"

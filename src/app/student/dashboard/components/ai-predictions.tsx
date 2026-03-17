@@ -47,7 +47,9 @@ export function AIPredictions({ student }: AIPredictionsProps) {
       ? "Prediction Confidence"
       : "Failure Risk Probability";
   const probabilityValue =
-    student.predictionConfidence ?? student.failureRiskProbability;
+    student.outcome === "Pass"
+      ? student.predictionConfidence
+      : student.failureRiskProbability;
 
   return (
     <Card>

@@ -44,8 +44,8 @@ const RunStudentAnalysisOutputSchema = z.object({
   riskLevel: z.enum(['Low', 'Medium', 'High']).describe('The predicted risk level of the student.'),
   outcome: z.enum(['Pass', 'Fail']).describe('The predicted outcome for the student.'),
   gradeCategory: z.enum(['S', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F']).describe('The predicted grade category for the student.'),
-  predictionConfidence: z.number().optional().describe('The prediction confidence (if outcome is Pass) as a percentage.'),
-  failureRiskProbability: z.number().optional().describe('The failure risk probability (if outcome is Fail) as a percentage.'),
+  predictionConfidence: z.number().nullable().optional().describe('The prediction confidence (if outcome is Pass) as a percentage.'),
+  failureRiskProbability: z.number().nullable().optional().describe('The failure risk probability (if outcome is Fail) as a percentage.'),
   subjectAnalyses: z.array(SubjectAnalysisOutputSchema).optional(),
 });
 
