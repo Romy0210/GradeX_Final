@@ -1,178 +1,233 @@
-# 🎓 GradeX 
+# 🎓 GradeX  
+### Student Performance Prediction and Recommendation System Using Machine Learning  
 
-### Student Performance Prediction and Recommendation System Using Machine Learning
+---
 
-## 📌 Overview
+## 📌 Project Overview  
 
-GradeX is a college-level academic analytics platform designed to predict student performance, identify at-risk students at an early stage, and generate AI-driven academic and behavioral recommendations.
+**GradeX** is an AI-driven academic analytics and student performance intelligence platform developed as a **final-year MCA academic project**.  
+The system is designed to assist educational institutions in **early identification of academically at-risk students**, enabling timely intervention through **data-driven insights and personalized study recommendations**.
 
-The system integrates Machine Learning workflows with modern full-stack web technologies to enable intelligent academic monitoring and intervention.
+GradeX integrates **Machine Learning prediction models**, **Explainable AI techniques**, and **Generative AI recommendation workflows** within a modern full-stack web ecosystem.  
+By combining statistical risk classification with intelligent advisory generation, the platform supports **proactive academic monitoring and strategic decision-making**.
 
-Project Type: Final-Year Academic Project
+---
 
-## 🎯 Objectives
-#### 🔹 Primary Objectives
+## 🎯 Objectives  
 
-- Predict student performance using Machine Learning
+### 🔹 Primary Objectives  
 
-- Detect at-risk students early
+- Predict student academic risk levels using Machine Learning  
+- Detect potential performance decline at an early stage  
+- Generate AI-driven personalized study plans and interventions  
+- Provide visual academic analytics dashboards for institutions  
 
-- Generate AI-based personalized study plans
+### 🔹 Secondary Objectives  
 
-- Provide detailed academic analytics
+- Support faculty with predictive academic intelligence  
+- Enable data-driven academic policy decisions  
+- Improve overall institutional academic performance outcomes  
+- Promote adaptive and personalized learning experiences  
 
-#### 🔹 Secondary Objectives
+---
 
-- Enable data-driven academic decision-making
+## 🚀 Key Features  
 
-- Support faculty with predictive insights
+### 👨‍🎓 Student Dashboard  
 
-- Improve institutional academic outcomes
+- Real-time academic performance overview  
+- Subject-wise marks and attendance analytics  
+- Machine Learning risk level prediction (Low / Medium / High)  
+- AI-generated personalized study plans  
+- Behavioral and motivational recommendations  
+- Profile and academic data management  
 
-### 🚀 Key Features
-#### 👨‍🎓 Student Dashboard
+### 👨‍💼 Administrator Dashboard  
 
-- Academic performance summary
+- Centralized student performance monitoring  
+- Early identification of high-risk students  
+- AI-powered academic performance reports  
+- Institutional analytics visualization  
+- Batch / semester performance segmentation  
+- Bulk student data upload and management  
+- Real-time synchronization with Firestore  
 
-- Subject-wise analytics
+---
 
-- Risk level prediction (Low / Medium / High)
+## 🏗️ System Architecture  
 
-- AI-generated personalized study plans
+GradeX follows a **layered modern web architecture** integrating scalable frontend technologies, backend BaaS services, AI orchestration workflows, and an independent Machine Learning microservice.
 
-- Academic behavior insights
+### 🔹 Frontend Layer  
 
-- Profile management
+- **Framework:** Next.js 15 (App Router architecture)  
+- **Language:** TypeScript + React  
+- **Styling:** Tailwind CSS  
+- **Component System:** Shadcn UI (Radix primitives)  
+- **Visualization:** Recharts analytics components  
 
-### 👨‍💼 Admin Dashboard
+### 🔹 Backend Core Layer (Firebase BaaS)  
 
-- Monitor overall student performance
+- **Authentication:** Firebase Auth (role-based routing for Admin / Student)  
+- **Database:** Firestore NoSQL database (single source of truth)  
+- **Storage:** Firebase Storage for media assets and profile images  
 
-- Identify at-risk students
+### 🔹 AI Orchestration Layer  
 
-- Generate AI-powered reports
+- **Workflow Engine:** Google Genkit Server Actions  
+- **LLM Routing:** OpenRouter integration  
+- **AI Flows:**  
+  - Student performance analysis  
+  - Personalized recommendation generation  
+  - Dynamic study plan creation  
 
-- Configure ML model parameters
+### 🔹 Machine Learning Microservice  
 
-- Real-time Firestore synchronization
+- **Environment:** Python 3 + FastAPI  
+- **Model:** Scikit-Learn Random Forest Classifier  
+- **Explainability:** SHAP feature attribution analysis  
+- **Deployment Style:** Independent local ML API service  
 
-- Institutional analytics overview
+---
 
-### 🏗️ System Architecture
+## 🧠 AI / Machine Learning Module  
 
-Frontend (Next.js + TypeScript)
-        ↓
-Next.js API Routes (Backend Layer)
-        ↓
-AI / ML Workflow Engine
-        ↓
-Firebase Firestore Database
-        ↓
-Firebase Authentication
+The GradeX intelligence engine combines **deterministic academic scoring**, **statistical prediction**, and **Generative AI reasoning** to produce meaningful academic insights.
 
-### 🔹 Architecture Highlights
+### 🔹 Implemented Capabilities  
 
-- Next.js App Router for scalable routing
+- Academic risk classification (Low / Medium / High)  
+- Feature importance explanation using SHAP  
+- Performance trend analysis  
+- Personalized academic intervention recommendations  
+- Intelligent structured study plan generation  
+- Behavioral performance motivation strategies  
 
-- API Routes for backend logic handling
+### 🔹 AI Workflow Directory  
 
-- AI workflows inside src/ai/flows
-
-- Firebase for authentication and real-time database
-
-- Tailwind CSS for modern responsive UI
-
-- Modular and scalable folder structure
-
-### 🧠 AI / Machine Learning Module
-#### 📁 AI Workflow Location
 src/ai/flows/
+├── run-student-analysis.ts
+├── generate-study-plan.ts
+├── generate-personalized-recommendations.ts
+└── predict-student-risk-level.ts
 
-#### 🔹 Implemented AI Modules
 
-- generate-personalized-recommendations.ts
+---
 
-- generate-student-report.ts
+## 🛠️ Technology Stack  
 
-- generate-study-plan.ts
+| Layer                | Technology Used                          |
+|----------------------|------------------------------------------|
+| Frontend             | Next.js 15 (App Router)                  |
+| Programming Language | TypeScript                               |
+| UI Styling           | Tailwind CSS + Shadcn UI                 |
+| Backend Logic        | Next.js Server Actions                   |
+| Database             | Firebase Firestore                       |
+| Authentication       | Firebase Auth                            |
+| Storage              | Firebase Storage                         |
+| AI Orchestration     | Google Genkit                            |
+| LLM Integration      | OpenRouter (Gemini / Claude / Llama)     |
+| Machine Learning     | Scikit-Learn Random Forest               |
+| ML API Framework     | Python FastAPI                           |
+| Explainable AI       | SHAP                                     |
+| Charting Library     | Recharts                                 |
 
-- predict-student-risk-level.ts
+---
 
-- run-student-analysis.ts
+## ✨ Architecture Highlights  
 
-- summarize-student-performance.ts
+- Modular layered system design  
+- Independent ML microservice scalability  
+- Explainable AI integration for academic transparency  
+- Token-efficient AI workflow persistence  
+- Role-based secure data access control  
+- Real-time Firestore synchronization  
+- Clean enterprise-style folder architecture  
 
-#### 🔹 AI Capabilities
+---
 
-- Risk classification (Low / Medium / High)
+## 📁 Project Directory Structure  
 
-- cademic trend analysis
+GradeX_Final/
+├── ml_backend/
+│ ├── api.py
+│ ├── train_model.py
+│ └── risk_model.pkl
+│
+├── src/
+│ ├── ai/
+│ │ └── flows/
+│ ├── app/
+│ │ ├── admin/
+│ │ ├── student/
+│ │ ├── login/
+│ │ └── register/
+│ ├── components/
+│ ├── firebase/
+│ └── lib/
+│
+└── firestore.rules
 
-- Performance summarization
+## ⚙️ Installation & Setup Guide  
 
-- Personalized improvement recommendations
+### 1️⃣ Clone Repository  
 
-- Intelligent academic insight generation
-
-### 🛠️ Technology Stack
-
-| Layer          | Technology                   |
-| -------------- | ---------------------------- |
-| Frontend       | Next.js 14+ (App Router)     |
-| Language       | TypeScript                   |
-| Backend        | Next.js API Routes           |
-| Database       | Firebase Firestore           |
-| Authentication | Firebase Auth                |
-| Styling        | Tailwind CSS                 |
-| AI Layer       | Custom ML Workflows          |
-| Deployment     | Firebase / Vercel Compatible |
-
-### Project Structure
-src/
- ├── ai/
- │    ├── flows/
- │    ├── dev.ts
- │    └── genkit.ts
- │
- ├── app/
- │    ├── admin/
- │    ├── student/
- │    │    ├── dashboard/
- │    │    ├── ai-summary/
- │    │    └── profile/
- │    ├── api/
- │    ├── login/
- │    └── register/
- │
- ├── components/
- ├── context/
- ├── firebase/
- ├── hooks/
- └── lib/
-
-### ⚙️ Installation & Setup
-#### 1️⃣ Clone Repository
+```bash
 git clone https://github.com/your-username/gradex.git
 cd gradex
+```
 
-#### 2️⃣ Install Dependencies
+###  2️⃣ Install Frontend Dependencies
+
+```bash
 npm install
+```
 
-#### 3️⃣ Configure Environment Variables
-Create a .env file:
+###  3️⃣ Configure Environment Variables
+
+Create .env.local file:
+
+```bash
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
+OPENROUTER_API_KEY=
+```
 
-#### 4️⃣ Run Development Server
+###  4️⃣ Run Development Server
+
+```bash
 npm run dev
 
-Application runs at: http://localhost:9002
+Application runs at:
+http://localhost:9002
 
-### 👨‍💻 Author
+```
+
+###  5️⃣ Running Machine Learning Backend
+
+Navigate to ML service directory:
+
+```bash
+cd ml_backend
+pip install -r requirements.txt
+uvicorn api:app --reload --port 8000
+```
+
+ML Prediction API available at:
+http://127.0.0.1:8000/predict
+
+### 🏁 Conclusion
+
+GradeX demonstrates how Machine Learning, Explainable AI, and Generative AI can be integrated into a scalable academic analytics ecosystem.
+The platform provides a practical institutional solution for early academic risk detection, personalized learning support, and strategic performance monitoring.
+
+This project highlights the importance of AI-assisted education systems in shaping the future of intelligent academic environments.
+
+### 👨💻 Author
 
 Romy Thomas
 Integrated MCA
@@ -185,12 +240,12 @@ Saintgits College of Engineering
 ### 🎓 Project Guide
 
 Dr. Rajesh K. S.
-Professor & Head of Department
+Professor 
 Department of Computer Applications
 Saintgits College of Engineering (Autonomous)
 Kottayam, Kerala
 
-#### 📄 License
+### 📄 Academic License
 
-This project is developed for academic purposes as part of the final-year curriculum requirement.
-Usage is permitted for educational and research purposes.
+This project is developed strictly for academic and research purposes as part of the final-year postgraduate curriculum.
+Usage, modification, and reference are permitted for educational and non-commercial research activities.

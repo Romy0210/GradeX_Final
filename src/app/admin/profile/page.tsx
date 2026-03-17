@@ -123,7 +123,7 @@ export default function AdminProfilePage() {
 
         toast({ title: "Profile updated successfully" });
         resetImageSelection();
-        form.reset(data, { keepIsDirty: false });
+        form.reset(data, { keepDirty: false });
 
     } catch (error: any) {
         toast({
