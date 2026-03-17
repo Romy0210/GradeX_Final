@@ -161,7 +161,16 @@ const getRiskReason = (student: Student): string => {
     if (student.attendancePercentage < 80) reasons.push('Low Attendance');
     if (student.assignmentCompletionPercentage < 70) reasons.push('Low Assignment Completion');
     if (student.pendingAssignments >= 3) reasons.push('High Pending Assignments');
-    if (reasons.length === 0) return "N/A";
+    
+    const failingSubjects = student.subjects?.filter(s => ((s.internalMark1 ?? 0) + (s.internalMark2 ?? 0)) < 40).map(s => s.subjectName) || [];
+    if (failingSubjects.length > 0) {
+        reasons.push(`Failing Subject(s): ${failingSubjects.join(', ')}`);
+    }
+
+    if (reasons.length === 0) {
+        if (student.riskLevel === 'High') return 'Unspecified High Risk (Check AI Analysis)';
+        return "N/A";
+    }
     return reasons.join('; ');
 }
 
