@@ -2,7 +2,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import { getStorage, type Storage } from 'firebase/storage';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { firebaseConfig } from './config';
 import { useUser } from './auth/use-user';
 import { FirebaseProvider, useFirebaseApp, useAuth, useFirestore, useStorage } from './provider';
@@ -20,7 +20,7 @@ function initializeFirebase() {
     // ✅ Always derive from the app instance
     const auth: Auth = getAuth(app);
     const firestore: Firestore = getFirestore(app);
-    const storage: Storage = getStorage(app);
+    const storage: FirebaseStorage = getStorage(app);
 
     return { app, auth, firestore, storage };
 }
