@@ -1,1 +1,1 @@
-["gpa", "attendancePercentage", "assignmentCompletionPercentage", "pendingAssignments", "overallAverageMarkPercentage", "assignment_ratio", "composite_score"]
+["gpa", "attendancePercentage", "assignmentCompletionPercentage", "pendingAssignments", "overallAverageMarkPercentage", "avgInternalMarkPercentage", "failingSubjectCount", "lowestSubjectMarkPercentage", "assignment_ratio", "composite_score", "has_failing_subject"]

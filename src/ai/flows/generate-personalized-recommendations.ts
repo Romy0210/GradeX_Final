@@ -51,9 +51,9 @@ const SubjectRecommendationSchema = z.object({
 });
 
 const PersonalizedRecommendationsOutputSchema = z.object({
-  academicRecommendations: z.string().describe('Explain the "Reasoning" behind their academic risk and give "Actionable Steps" to fix it. Write in very simple, plain English without any academic jargon.'),
-  behavioralRecommendations: z.string().describe('Explain the "Reasoning" behind their attendance/assignments and give "Actionable Steps" to fix it. Write in very simple, plain English without any academic jargon.'),
-  interventionRecommendations: z.string().describe('Explain the "Reasoning" for needing help and give "Actionable Steps". Write in very simple, plain English without any academic jargon.'),
+  academicRecommendations: z.string().describe('Explain the "Reasoning" behind their academic performance and give "Actionable Steps" to fix issues OR maintain excellence. Write in very simple English.'),
+  behavioralRecommendations: z.string().describe('Explain the "Reasoning" behind their attendance/assignments and give "Actionable Steps" to fix issues OR maintain excellence. Write in very simple English.'),
+  interventionRecommendations: z.string().describe('Explain why help is needed and give "Actionable Steps", OR provide high praise and motivation if they are performing exceptionally well. Write in very simple English.'),
   subjectRecommendations: z.array(SubjectRecommendationSchema).describe('An array of subject-specific recommendations. Return empty array if none.'),
 });
 export type PersonalizedRecommendationsOutput = z.infer<typeof PersonalizedRecommendationsOutputSchema>;
@@ -86,7 +86,7 @@ export async function generatePersonalizedRecommendations(
           role: "system",
           content: `You are a helpful, extremely easy-to-understand academic advisor. 
           Analyze the student metrics and provide personalized advice.
-          Keep the tone encouraging.
+          Keep the tone encouraging and supportive.
           CRITICAL: You MUST write your response using very simple, plain English (8th-grade reading level). Avoid dense paragraphs, avoid academic jargon, and avoid complex vocabulary. Speak directly to the student.`
         },
         {
@@ -95,8 +95,10 @@ export async function generatePersonalizedRecommendations(
           
 Strictly follow the JSON structure. 
 For Academic, Behavioral, and Intervention, use this exact format with basic words:
-1. **The 'Why':** Explain why this advice is needed using their numbers (e.g., "Because your attendance is only 75%...").
-2. **What to do now:** Give 2-3 clear, simple steps to fix it.
+1. **The 'Why':** Explain why this advice/praise is needed using their numbers (e.g., "Because your attendance is an excellent 100%...").
+2. **What to do now:** Give 2-3 clear, simple steps to fix issues, OR if they are doing great, give steps to maintain their streak or explore advanced topics.
+
+CRITICAL: If the student is performing exceptionally well (e.g. Risk Level is Low, grades are high), NEVER say "No advice needed". Instead, provide high praise, appreciate their hard work, and give motivational tips to keep up the excellent work!
 
 For subjectRecommendations, provide 1 very simple sentence.`
         }

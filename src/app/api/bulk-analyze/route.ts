@@ -23,6 +23,15 @@ export async function POST(request: Request) {
         assignmentCompletionPercentage: student.assignmentCompletionPercentage,
         pendingAssignments: student.pendingAssignments,
         overallAverageMarkPercentage: student.overallAverageMarkPercentage,
+        subjects: student.subjects?.map(s => ({
+          subjectId: s.subjectId,
+          subjectName: s.subjectName,
+          internalMark1: s.internalMark1 ?? 0,
+          internalMark2: s.internalMark2 ?? 0,
+          totalAssignments: s.totalAssignments ?? 0,
+          completedAssignments: s.completedAssignments ?? 0,
+          subjectAttendancePercentage: s.subjectAttendancePercentage,
+        })),
         highRiskThreshold: modelParameters?.highRiskThreshold,
         mediumRiskThreshold: modelParameters?.mediumRiskThreshold,
       });

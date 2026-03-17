@@ -70,7 +70,24 @@ export async function runStudentAnalysis(
   input: RunStudentAnalysisInput
 ): Promise<RunStudentAnalysisOutput> {
 
-  // 1. Call the Local FastAPI Machine Learning Prediction Service
+  // 1. Compute per-subject internal mark signals from the real subject data
+  let avgInternalMarkPercentage: number | undefined;
+  let failingSubjectCount: number | undefined;
+  let lowestSubjectMarkPercentage: number | undefined;
+
+  if (input.subjects && input.subjects.length > 0) {
+    const subjectMarkPercentages = input.subjects.map(s => {
+      const totalMark = (s.internalMark1 ?? 0) + (s.internalMark2 ?? 0);
+      return (totalMark / 80) * 100; // Each internal is out of 40, total out of 80
+    });
+    avgInternalMarkPercentage = parseFloat(
+      (subjectMarkPercentages.reduce((a, b) => a + b, 0) / subjectMarkPercentages.length).toFixed(2)
+    );
+    failingSubjectCount = subjectMarkPercentages.filter(m => m < 40).length;
+    lowestSubjectMarkPercentage = parseFloat(Math.min(...subjectMarkPercentages).toFixed(2));
+  }
+
+  // 2. Call the Local FastAPI Machine Learning Prediction Service
   let mlPrediction;
   try {
     const response = await fetch("http://127.0.0.1:8000/predict-student-analysis", {
@@ -84,8 +101,12 @@ export async function runStudentAnalysis(
         assignmentCompletionPercentage: input.assignmentCompletionPercentage,
         pendingAssignments: input.pendingAssignments,
         overallAverageMarkPercentage: input.overallAverageMarkPercentage,
+        // Real subject-level internal mark signals
+        ...(avgInternalMarkPercentage !== undefined && { avgInternalMarkPercentage }),
+        ...(failingSubjectCount !== undefined && { failingSubjectCount }),
+        ...(lowestSubjectMarkPercentage !== undefined && { lowestSubjectMarkPercentage }),
       }),
-      cache: "no-store", // Ensure fresh prediction
+      cache: "no-store",
     });
 
     if (!response.ok) {

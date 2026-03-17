@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from typing import Optional
 import joblib
 import pandas as pd
 import numpy as np
@@ -13,7 +14,7 @@ app = FastAPI(title="GradeX ML Prediction API", description="AI prediction engin
 # Allow CORS for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:9002"], # Added 9002 based on user's dev server port
+    allow_origins=["http://localhost:3000", "http://localhost:9002"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,6 +33,7 @@ try:
     # Initialize SHAP explainer
     explainer = shap.TreeExplainer(model)
     print("✅ Models and SHAP Explainer loaded successfully.")
+    print(f"✅ Model features: {feature_names}")
 except Exception as e:
     print(f"❌ Error loading models: {e}")
     model = None
@@ -39,19 +41,22 @@ except Exception as e:
     explainer = None
     feature_names = None
 
+
 # Input Schema Model
 class StudentFeatures(BaseModel):
     gpa: float = Field(..., description="GPA out of 10")
     attendancePercentage: float = Field(..., description="Attendance Percentage (%)")
     assignmentCompletionPercentage: float = Field(..., description="Overall Assignment Completion Percentage (%)")
     pendingAssignments: int = Field(..., description="Total Number of Pending Assignments")
-    overallAverageMarkPercentage: float = Field(..., description="Overall Average Mark Percentage")
+    overallAverageMarkPercentage: float = Field(..., description="Overall Average Mark Percentage (fallback if no subjects)")
+    # New: per-subject internal mark signals (optional for backward compat.)
+    avgInternalMarkPercentage: Optional[float] = Field(None, description="Average of (internalMark1+internalMark2)/80*100 across all subjects")
+    failingSubjectCount: Optional[int] = Field(None, description="Number of subjects where average internal marks < 40%")
+    lowestSubjectMarkPercentage: Optional[float] = Field(None, description="Lowest subject average mark percentage among all subjects")
+
 
 # Prediction Logic Helper
 def assign_grade(gpa, avg_mark, risk_level):
-    """
-    Apply grade transformation based on the same rules used during training to return a grade
-    """
     if avg_mark >= 90: base_grade = 'S'
     elif avg_mark >= 85: base_grade = 'A+'
     elif avg_mark >= 80: base_grade = 'A'
@@ -88,29 +93,45 @@ async def predict_risk(student: StudentFeatures):
         raise HTTPException(status_code=500, detail="Machine Learning model is not loaded on the server.")
         
     try:
-        # Engineering features
+        # Use real internal marks if provided, otherwise fall back to overallAverageMarkPercentage
+        avg_internal = student.avgInternalMarkPercentage \
+            if student.avgInternalMarkPercentage is not None \
+            else student.overallAverageMarkPercentage
+
+        failing_count = student.failingSubjectCount \
+            if student.failingSubjectCount is not None \
+            else (1 if avg_internal < 40 else 0)
+
+        lowest_mark = student.lowestSubjectMarkPercentage \
+            if student.lowestSubjectMarkPercentage is not None \
+            else avg_internal
+
+        # Engineering features (same as training)
         assignment_ratio = student.assignmentCompletionPercentage / 100.0
         composite_score = (
-            (student.overallAverageMarkPercentage * 0.6) + 
+            (avg_internal * 0.6) + 
             (student.assignmentCompletionPercentage * 0.2) + 
             (student.attendancePercentage * 0.2)
         )
+        has_failing_subject = 1 if failing_count > 0 else 0
         
-        # Format for pandas exactly like training
+        # Build input aligned to training feature order
         input_data = {
             'gpa': [student.gpa],
             'attendancePercentage': [student.attendancePercentage],
             'assignmentCompletionPercentage': [student.assignmentCompletionPercentage],
             'pendingAssignments': [student.pendingAssignments],
             'overallAverageMarkPercentage': [student.overallAverageMarkPercentage],
+            'avgInternalMarkPercentage': [avg_internal],
+            'failingSubjectCount': [failing_count],
+            'lowestSubjectMarkPercentage': [lowest_mark],
             'assignment_ratio': [assignment_ratio],
-            'composite_score': [composite_score]
+            'composite_score': [composite_score],
+            'has_failing_subject': [has_failing_subject],
         }
         
         df_input = pd.DataFrame(input_data)
-        
-        # Reorder to match training
-        df_input = df_input[feature_names]
+        df_input = df_input[feature_names]  # Reorder to match training
         
         # Predict class and probability
         prediction = model.predict(df_input)
@@ -118,63 +139,63 @@ async def predict_risk(student: StudentFeatures):
         
         predicted_class_idx = prediction[0]
         risk_level = encoder.inverse_transform([predicted_class_idx])[0]
+        confidence = float(np.max(probabilities) * 100)
         
-        # Max probability
-        confidence = float(np.max(probabilities) * 100) # Percentage string
+        # Hard override: if any subject is failing, MUST be High risk
+        if failing_count > 0 and risk_level != "High":
+            print(f"⚠️  Override: failingSubjectCount={failing_count}, forcing High risk (was {risk_level})")
+            risk_level = "High"
         
-        # Derive Outcome and Grade Category based on predictions
+        # Derive outcome and grade
         outcome = "Fail" if risk_level == "High" else "Pass"
-        grade = assign_grade(student.gpa, student.overallAverageMarkPercentage, risk_level)
+        grade_mark = avg_internal  # use real internal mark for grade
+        grade = assign_grade(student.gpa, grade_mark, risk_level)
         
         # --- Explainable AI (SHAP) ---
         top_factors = []
         try:
             if explainer:
                 shap_values = explainer.shap_values(df_input)
-                # For Multi-class classification, shap_values is a list of arrays (one for each class)
-                # We explain the predicted class
                 class_shap_values = shap_values[predicted_class_idx][0]
                 
-                # Zip feature names with their SHAP impact values
                 feature_impacts = list(zip(feature_names, class_shap_values))
-                
-                # Sort by absolute SHAP value (impact magnitude) descending
                 feature_impacts.sort(key=lambda x: abs(x[1]), reverse=True)
                 
-                # Generate human readable top factors
-                for feat_name, impact in feature_impacts[:3]: # Top 3 factors
-                    # Very simple natural language mapping
+                for feat_name, impact in feature_impacts[:4]:  # Top 4 factors
                     val = input_data[feat_name][0]
-                    direction = "Increased" if impact > 0 else "Decreased"
                     
-                    if feat_name == "gpa": name = "GPA"
-                    elif feat_name == "attendancePercentage": name = "Attendance"
-                    elif feat_name == "assignmentCompletionPercentage": name = "Assignment Completion"
-                    elif feat_name == "pendingAssignments": name = "Pending Assignments count"
-                    elif feat_name == "overallAverageMarkPercentage": name = "Average Marks"
-                    elif feat_name == "composite_score": name = "Composite Scoring"
-                    else: continue
-                    
-                    # More natural mapping:
                     if risk_level == "High":
-                        if feat_name == "attendancePercentage" and val < 80: top_factors.append(f"Low attendance ({val}%)")
-                        elif feat_name == "gpa" and val < 6.5: top_factors.append(f"Low GPA ({val})")
-                        elif feat_name == "pendingAssignments" and val >= 3: top_factors.append(f"High pending assignments ({val})")
-                        elif feat_name == "overallAverageMarkPercentage" and val < 40: top_factors.append(f"Low average marks ({val}%)")
-                        elif "Overall academic performance is compounding risk." not in top_factors:
-                             top_factors.append("Overall academic performance is compounding risk.")
+                        if feat_name == "failingSubjectCount" and val >= 1:
+                            top_factors.append(f"Failing {int(val)} subject(s) with marks below 40%")
+                        elif feat_name == "lowestSubjectMarkPercentage" and val < 40:
+                            top_factors.append(f"Lowest subject mark is only {val:.1f}%")
+                        elif feat_name == "avgInternalMarkPercentage" and val < 50:
+                            top_factors.append(f"Low average internal marks ({val:.1f}%)")
+                        elif feat_name == "attendancePercentage" and val < 80:
+                            top_factors.append(f"Low attendance ({val:.1f}%)")
+                        elif feat_name == "gpa" and val < 6.5:
+                            top_factors.append(f"Low GPA ({val})")
+                        elif feat_name == "pendingAssignments" and val >= 3:
+                            top_factors.append(f"High pending assignments ({int(val)})")
                     elif risk_level == "Low":
-                        if feat_name == "attendancePercentage" and val >= 90: top_factors.append(f"Strong attendance ({val}%)")
-                        elif feat_name == "gpa" and val > 8.0: top_factors.append(f"Strong GPA ({val})")
-                        elif feat_name == "pendingAssignments" and val == 0: top_factors.append("No pending assignments")
-                        elif feat_name == "overallAverageMarkPercentage" and val >= 70: top_factors.append(f"Good average marks ({val}%)")
-                        elif "Consistently strong metrics across the board." not in top_factors:
-                             top_factors.append("Consistently strong metrics across the board.")
+                        if feat_name == "avgInternalMarkPercentage" and val >= 70:
+                            top_factors.append(f"Strong internal marks ({val:.1f}%)")
+                        elif feat_name == "attendancePercentage" and val >= 90:
+                            top_factors.append(f"Strong attendance ({val:.1f}%)")
+                        elif feat_name == "gpa" and val > 8.0:
+                            top_factors.append(f"Strong GPA ({val})")
+                        elif feat_name == "pendingAssignments" and val == 0:
+                            top_factors.append("No pending assignments")
                     else:
-                        top_factors.append(f"{name} ({val:.1f}) is an impacting factor.")
-                        
-                # Ensure unique strings
-                top_factors = list(set(top_factors))
+                        if feat_name in ["avgInternalMarkPercentage", "composite_score", "gpa"]:
+                            label_map = {
+                                "avgInternalMarkPercentage": "Average internal marks",
+                                "composite_score": "Composite score",
+                                "gpa": "GPA"
+                            }
+                            top_factors.append(f"{label_map.get(feat_name, feat_name)} ({val:.1f}) is a contributing factor.")
+
+                top_factors = list(dict.fromkeys(top_factors))  # deduplicate preserving order
                 if len(top_factors) == 0:
                     top_factors.append("Borderline metrics contributing to risk assessment.")
         except Exception as e:
@@ -193,7 +214,12 @@ async def predict_risk(student: StudentFeatures):
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "model_loaded": model is not None, "features": feature_names}
+
+
 if __name__ == "__main__":
     import uvicorn
-    # Optional logic to run it directly
     uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=True)
