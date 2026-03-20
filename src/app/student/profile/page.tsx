@@ -14,8 +14,8 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { getAuth, updateProfile, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useFirestore, useFirebaseApp, useStorage } from '@/firebase';
+import { uploadProfilePhoto } from '@/supabase/storage';
+import { useFirestore, useFirebaseApp } from '@/firebase';
 import { useState, useEffect, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -50,7 +50,6 @@ export default function StudentProfilePage() {
 
   const app = useFirebaseApp();
   const firestore = useFirestore();
-  const storage = useStorage();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
@@ -108,12 +107,12 @@ export default function StudentProfilePage() {
       toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload a JPG or PNG image.' });
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size cannot exceed 2MB.' });
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size cannot exceed 10MB.' });
       return;
     }
 
-    if (!user || !firestore || !app || !storage || !studentData) {
+    if (!user || !firestore || !app || !studentData) {
       toast({ variant: 'destructive', title: 'Error', description: 'Services not ready. Please try again.' });
       return;
     }
@@ -126,10 +125,8 @@ export default function StudentProfilePage() {
     try {
       const auth = getAuth(app);
 
-      // Upload to Firebase Storage using the initialized storage instance
-      const fileRef = storageRef(storage, `avatars/${user.uid}`);
-      const snapshot = await uploadBytes(fileRef, file);
-      const newPhotoURL = await getDownloadURL(snapshot.ref);
+      // Upload to Supabase Storage instead of Firebase Storage
+      const newPhotoURL = await uploadProfilePhoto(user.uid, file);
 
       // Update Firebase Auth
       if (auth.currentUser) {
@@ -331,7 +328,7 @@ export default function StudentProfilePage() {
                   <Camera className="mr-2 h-4 w-4" />
                   Change Photo
                 </Button>
-                <p className="text-xs text-muted-foreground mt-2">JPG / PNG • Max 2MB</p>
+                <p className="text-xs text-muted-foreground mt-2">JPG / PNG • Max 10MB</p>
                 <input
                   type="file"
                   ref={fileInputRef}

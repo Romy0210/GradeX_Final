@@ -13,7 +13,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { getAuth, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadProfilePhoto } from '@/supabase/storage';
 import { useFirestore, useFirebaseApp } from '@/firebase';
 import { useState, useEffect, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -58,8 +58,8 @@ export default function AdminProfilePage() {
         toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload a JPG or PNG image.' });
         return;
       }
-      if (file.size > 2 * 1024 * 1024) { // 2MB
-        toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size cannot exceed 2MB.' });
+      if (file.size > 10 * 1024 * 1024) { // 10MB
+        toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size cannot exceed 10MB.' });
         return;
       }
       setImageFile(file);
@@ -85,7 +85,6 @@ export default function AdminProfilePage() {
     
     try {
         const auth = getAuth(app);
-        const storage = getStorage(app);
 
         const hasNameChanged = isDirty && data.displayName !== userProfile?.displayName;
         const hasPhotoChanged = imageFile !== null;
@@ -100,9 +99,8 @@ export default function AdminProfilePage() {
         const firestoreUpdates: { displayName?: string; photoURL?: string } = {};
 
         if (hasPhotoChanged && imageFile) {
-            const fileRef = storageRef(storage, `avatars/${user.uid}`);
-            const snapshot = await uploadBytes(fileRef, imageFile);
-            const newPhotoURL = await getDownloadURL(snapshot.ref);
+            // Upload to Supabase Storage instead of Firebase Storage
+            const newPhotoURL = await uploadProfilePhoto(user.uid, imageFile);
             authUpdates.photoURL = newPhotoURL;
             firestoreUpdates.photoURL = newPhotoURL;
         }
@@ -180,7 +178,7 @@ export default function AdminProfilePage() {
                   <Camera className="mr-2 h-4 w-4" />
                   Change Photo
                 </Button>
-                <p className="text-xs text-muted-foreground mt-2">JPG / PNG • Max 2MB</p>
+                <p className="text-xs text-muted-foreground mt-2">JPG / PNG • Max 10MB</p>
                 <input
                   type="file"
                   ref={fileInputRef}
