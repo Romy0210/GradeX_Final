@@ -104,7 +104,7 @@ export function DashboardLayout({ children, role, alertCount }: DashboardLayoutP
           {user && userProfile && (
             <div className="flex flex-col items-start gap-3 rounded-lg bg-sidebar-accent p-4 w-full overflow-hidden">
               <Avatar className="h-12 w-12 shrink-0">
-                <AvatarImage src={user.photoURL ?? undefined} />
+                <AvatarImage src={userProfile.photoURL ?? user.photoURL ?? undefined} />
                 <AvatarFallback>{userProfile.displayName?.[0] || 'A'}</AvatarFallback>
               </Avatar>
               <div className="w-full min-w-0">

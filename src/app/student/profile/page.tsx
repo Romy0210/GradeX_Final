@@ -19,7 +19,11 @@ import { useFirestore, useFirebaseApp } from '@/firebase';
 import { useState, useEffect, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { useTheme } from 'next-themes';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Settings } from 'lucide-react';
 
 const profileFormSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters."),
@@ -45,6 +49,7 @@ type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 
 export default function StudentProfilePage() {
   const { user, userProfile, isLoading: isUserLoading } = useUser();
+  const { setTheme, theme } = useTheme();
   const { students, updateStudent, findStudentById } = useStudentData();
   const [studentData, setStudentData] = useState<ReturnType<typeof findStudentById>>(undefined);
 
@@ -530,6 +535,86 @@ export default function StudentProfilePage() {
               </CardFooter>
             </form>
           </Form>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>
+              Choose how GradeX looks. The default will be based on your system.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div>
+              <Label className="mb-4 block">Theme</Label>
+              <RadioGroup
+                value={theme}
+                onValueChange={(newTheme) => setTheme(newTheme as "light" | "dark" | "system")}
+                className="grid max-w-md grid-cols-3 gap-8 pt-2"
+              >
+                <FormItem>
+                  <Label className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
+                    <RadioGroupItem value="light" className="sr-only" />
+                    <div className="items-center rounded-md border-2 border-muted p-1 hover:border-accent">
+                      <div className="space-y-2 rounded-sm bg-[#ecedf0] p-2">
+                        <div className="space-y-2 rounded-md bg-white p-2 shadow-sm">
+                          <div className="h-2 w-[80px] rounded-lg bg-[#ecedf0]" />
+                          <div className="h-2 w-[100px] rounded-lg bg-[#ecedf0]" />
+                        </div>
+                        <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm">
+                          <div className="h-4 w-4 rounded-full bg-[#ecedf0]" />
+                          <div className="h-2 w-[100px] rounded-lg bg-[#ecedf0]" />
+                        </div>
+                        <div className="flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm">
+                          <div className="h-4 w-4 rounded-full bg-[#ecedf0]" />
+                          <div className="h-2 w-[100px] rounded-lg bg-[#ecedf0]" />
+                        </div>
+                      </div>
+                    </div>
+                    <span className="block w-full p-2 text-center font-normal">
+                      Light
+                    </span>
+                  </Label>
+                </FormItem>
+                <FormItem>
+                  <Label className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
+                    <RadioGroupItem value="dark" className="sr-only" />
+                    <div className="items-center rounded-md border-2 border-muted bg-popover p-1 hover:border-accent">
+                      <div className="space-y-2 rounded-sm bg-slate-950 p-2">
+                        <div className="space-y-2 rounded-md bg-slate-800 p-2 shadow-sm">
+                          <div className="h-2 w-[80px] rounded-lg bg-slate-400" />
+                          <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
+                        </div>
+                        <div className="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm">
+                          <div className="h-4 w-4 rounded-full bg-slate-400" />
+                          <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
+                        </div>
+                        <div className="flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm">
+                          <div className="h-4 w-4 rounded-full bg-slate-400" />
+                          <div className="h-2 w-[100px] rounded-lg bg-slate-400" />
+                        </div>
+                      </div>
+                    </div>
+                    <span className="block w-full p-2 text-center font-normal">
+                      Dark
+                    </span>
+                  </Label>
+                </FormItem>
+                <FormItem>
+                  <Label className="[&:has([data-state=checked])>div]:border-primary cursor-pointer">
+                    <RadioGroupItem value="system" className="sr-only" />
+                    <div className="items-center rounded-md border-2 border-muted p-1 hover:border-accent">
+                      <div className="flex h-[116px] items-center justify-center rounded-lg bg-muted-foreground/10 p-6">
+                        <Settings className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    </div>
+                    <span className="block w-full p-2 text-center font-normal">
+                      System
+                    </span>
+                  </Label>
+                </FormItem>
+              </RadioGroup>
+            </div>
+          </CardContent>
         </Card>
       </div>
     </>

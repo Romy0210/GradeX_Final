@@ -30,7 +30,7 @@ export default function AdminProfilePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,28 +51,61 @@ export default function AdminProfilePage() {
     }
   }, [userProfile, form]);
   
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      if (!['image/jpeg', 'image/png'].includes(file.type)) {
-        toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload a JPG or PNG image.' });
-        return;
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload a JPG or PNG image.' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) { // 10MB
+      toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size cannot exceed 10MB.' });
+      return;
+    }
+
+    if (!user || !firestore || !app) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Services not ready. Please try again.' });
+      return;
+    }
+
+    // Show local preview immediately
+    setImagePreview(URL.createObjectURL(file));
+    setIsUploadingPhoto(true);
+    toast({ title: 'Uploading photo...', description: 'Your profile picture is being saved to Supabase.' });
+
+    try {
+      const auth = getAuth(app);
+
+      // Upload to Supabase Storage
+      const newPhotoURL = await uploadProfilePhoto(user.uid, file);
+
+      // Update Firebase Auth
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { photoURL: newPhotoURL });
       }
-      if (file.size > 10 * 1024 * 1024) { // 10MB
-        toast({ variant: 'destructive', title: 'File Too Large', description: 'Image size cannot exceed 10MB.' });
-        return;
-      }
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
+
+      // Update Firestore users collection
+      const userDocRef = doc(firestore, 'users', user.uid);
+      await setDoc(userDocRef, { photoURL: newPhotoURL }, { merge: true });
+
+      setImagePreview(newPhotoURL);
+      toast({ title: 'Profile photo saved!', description: 'Your new profile picture is live.' });
+    } catch (error: any) {
+      console.error('Photo upload error:', error);
+      setImagePreview(null);
+      toast({ variant: 'destructive', title: 'Upload Failed', description: error.message || 'Check browser console for details.' });
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
   
   const resetImageSelection = () => {
-      setImageFile(null);
-      setImagePreview(null);
-      if(fileInputRef.current) {
-          fileInputRef.current.value = "";
-      }
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   async function onSubmit(data: ProfileFormValues) {
@@ -87,23 +120,15 @@ export default function AdminProfilePage() {
         const auth = getAuth(app);
 
         const hasNameChanged = isDirty && data.displayName !== userProfile?.displayName;
-        const hasPhotoChanged = imageFile !== null;
 
-        if (!hasNameChanged && !hasPhotoChanged) {
+        if (!hasNameChanged) {
             toast({ title: "No changes to save." });
             setIsSaving(false);
             return;
         }
 
-        const authUpdates: { displayName?: string; photoURL?: string } = {};
-        const firestoreUpdates: { displayName?: string; photoURL?: string } = {};
-
-        if (hasPhotoChanged && imageFile) {
-            // Upload to Supabase Storage instead of Firebase Storage
-            const newPhotoURL = await uploadProfilePhoto(user.uid, imageFile);
-            authUpdates.photoURL = newPhotoURL;
-            firestoreUpdates.photoURL = newPhotoURL;
-        }
+        const authUpdates: { displayName?: string } = {};
+        const firestoreUpdates: { displayName?: string } = {};
 
         if (hasNameChanged) {
             authUpdates.displayName = data.displayName;
@@ -166,7 +191,13 @@ export default function AdminProfilePage() {
                   <AvatarImage src={imagePreview ?? userProfile?.photoURL ?? user.photoURL ?? undefined} />
                   <AvatarFallback>{userProfile?.displayName?.[0] || user.email?.[0]}</AvatarFallback>
                 </Avatar>
-                <span className="absolute bottom-1 right-1 block h-4 w-4 rounded-full bg-green-500 ring-2 ring-card" />
+                {isUploadingPhoto ? (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                  </div>
+                ) : (
+                  <span className="absolute bottom-1 right-1 block h-4 w-4 rounded-full bg-green-500 ring-2 ring-card" />
+                )}
               </div>
               <div className="flex-1 text-center md:text-left">
                 <h2 className="text-2xl font-bold">{form.watch('displayName')}</h2>
@@ -244,7 +275,7 @@ export default function AdminProfilePage() {
                         />
                     </CardContent>
                     <CardFooter className="flex-col items-start gap-4">
-                        <Button type="submit" disabled={(!isDirty && !imageFile) || isSaving}>
+                        <Button type="submit" disabled={!isDirty || isSaving}>
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Save Changes
                         </Button>

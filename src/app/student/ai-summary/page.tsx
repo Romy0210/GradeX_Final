@@ -52,7 +52,7 @@ export default function AISummaryPage() {
         severity: 'Warning',
         title: 'High Academic Risk Alert',
         message: `Your overall academic performance has placed you in a high-risk category. Please review your AI summary and study plan for targeted recommendations.`,
-        timestamp: '1 hour ago'
+        timestamp: 'Just now'
       });
     }
     // Rule 2: High number of pending assignments
@@ -62,7 +62,7 @@ export default function AISummaryPage() {
         severity: 'Warning',
         title: `Admin Alert: ${student.pendingAssignments} Pending Assignments`,
         message: `Your administrator has noted that you have a high number of pending assignments. Please prioritize completing these to improve your academic standing.`,
-        timestamp: '2 hours ago'
+        timestamp: 'Just now'
       });
     }
     // Rule 3: Low attendance
@@ -72,7 +72,7 @@ export default function AISummaryPage() {
         severity: 'Warning',
         title: 'Low Attendance Alert',
         message: `Your overall attendance is currently ${student.attendancePercentage}%. Consistent attendance is crucial for success.`,
-        timestamp: '4 hours ago'
+        timestamp: 'Just now'
       });
     }
   }
