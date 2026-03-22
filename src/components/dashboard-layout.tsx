@@ -14,9 +14,11 @@ import {
   User,
   BookMarked,
   Monitor,
+  MessageSquare,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { useCorrectionRequests } from "@/context/correction-request-provider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +49,7 @@ const adminNavItems = [
   { href: "/admin/dashboard", icon: Home, label: "Dashboard" },
   { href: "/admin/students", icon: Users, label: "Students" },
   { href: "/admin/monitoring", icon: Monitor, label: "Academic Monitoring" },
+  { href: "/admin/correction-requests", icon: MessageSquare, label: "Correction Requests" },
   { href: "/admin/subjects", icon: BookMarked, label: "Subjects" },
   { href: "/admin/analytics", icon: TrendingUp, label: "Analytics" },
   { href: "/admin/profile", icon: User, label: "Profile" },
@@ -63,6 +66,12 @@ export function DashboardLayout({ children, role, alertCount }: DashboardLayoutP
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, userProfile } = useUser();
+  const { requests } = useCorrectionRequests();
+
+  const pendingRequestsCount = useMemo(() => {
+    return requests.filter(r => r.status === 'pending').length;
+  }, [requests]);
+
   const navItems = role === "admin" ? adminNavItems : studentNavItems;
 
   useEffect(() => {
@@ -129,6 +138,10 @@ export function DashboardLayout({ children, role, alertCount }: DashboardLayoutP
                     {item.href === "/student/ai-summary" && alertCount && alertCount > 0 ? (
                       <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-destructive px-1 text-xs font-medium text-destructive-foreground">
                         {alertCount}
+                      </span>
+                    ) : item.href === "/admin/correction-requests" && pendingRequestsCount > 0 ? (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                        {pendingRequestsCount}
                       </span>
                     ) : null}
                   </Link>

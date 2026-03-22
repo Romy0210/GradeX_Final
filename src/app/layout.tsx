@@ -8,6 +8,7 @@ import { StudentDataProvider } from '@/context/student-data-provider';
 import { SettingsProvider } from '@/context/settings-provider';
 import { AcademicStructureProvider } from '@/context/academic-structure-provider';
 import { ActivityLogProvider } from '@/context/activity-log-provider';
+import { CorrectionRequestProvider } from '@/context/correction-request-provider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -39,15 +40,17 @@ export default function RootLayout({
             <AcademicStructureProvider>
               <StudentDataProvider>
                 <ActivityLogProvider>
-                  <ThemeProvider
-                    attribute="class"
-                    defaultTheme="dark"
-                    enableSystem
-                    disableTransitionOnChange
-                  >
-                    {children}
-                    <Toaster />
-                  </ThemeProvider>
+                  <CorrectionRequestProvider>
+                    <ThemeProvider
+                      attribute="class"
+                      defaultTheme="dark"
+                      enableSystem
+                      disableTransitionOnChange
+                    >
+                      {children}
+                      <Toaster />
+                    </ThemeProvider>
+                  </CorrectionRequestProvider>
                 </ActivityLogProvider>
               </StudentDataProvider>
             </AcademicStructureProvider>

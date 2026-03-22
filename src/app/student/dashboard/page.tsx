@@ -6,22 +6,29 @@ import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { PerformanceSnapshot } from "./components/performance-snapshot";
 import { AttendanceBehavior } from "./components/attendance-behavior";
 import { useUser } from "@/firebase/auth/use-user";
-import { Loader2 } from "lucide-react";
+import { Loader2, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Student } from "@/lib/data";
 import { SubjectPerformanceBreakdown } from "./components/subject-performance-breakdown";
+import { ReportErrorDialog } from "./components/report-error-dialog";
+import { Badge } from "@/components/ui/badge";
+import { useCorrectionRequests } from "@/context/correction-request-provider";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function StudentDashboard() {
   const { user, isLoading: isUserLoading } = useUser();
   const { students } = useStudentData();
+  const { requests } = useCorrectionRequests();
   const [student, setStudent] = useState<Student | null | undefined>(undefined);
 
   useEffect(() => {
     if (!isUserLoading && user) {
       if (students.length === 0) {
-        // If students array is empty, we must check if data is still loading from Firestore
-        // However, onSnapshot initializes with an empty array.
-        // To prevent infinite loading, we set student to null if it's not found in the list.
         setStudent(null);
       } else {
         const currentStudent = students.find((s) => s.authUid === user.uid || s.id === user.uid);
@@ -51,8 +58,7 @@ export default function StudentDashboard() {
     );
   }
 
-  // Resolve profilePhoto: if it's an http URL use directly, if it's a known
-  // placeholder ID resolve it, otherwise fall back to undefined (shows initials)
+  // Resolve profilePhoto
   let finalProfilePhotoUrl: string | undefined = undefined;
   if (student.profilePhoto) {
     if (student.profilePhoto.startsWith('http')) {
@@ -62,22 +68,43 @@ export default function StudentDashboard() {
       if (placeholder) {
         finalProfilePhotoUrl = placeholder.imageUrl;
       }
-      // If no matching placeholder found, leave undefined → AvatarFallback shows
     }
   }
+
+  const pendingRequests = requests.filter(r => r.status === 'pending');
 
   return (
     <>
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome back, {student.name.split(" ")[0]}!
-          </h1>
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight">
+              Welcome back, {student.name.split(" ")[0]}!
+            </h1>
+            {pendingRequests.length > 0 && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Badge variant="outline" className="text-amber-500 border-amber-500/50 bg-amber-500/5">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {pendingRequests.length} Pending Correction{pendingRequests.length > 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>You have {pendingRequests.length} academic correction request(s) awaiting review.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Here's a summary of your academic performance.
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <ReportErrorDialog student={student} />
           <Avatar className="h-14 w-14">
             <AvatarImage src={finalProfilePhotoUrl} alt={student.name} />
             <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>

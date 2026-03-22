@@ -9,10 +9,16 @@ import RecentActivity from './components/recent-activity';
 import AcademicGroupOverview from './components/academic-group-overview';
 import RiskHeatmap from './components/risk-heatmap';
 import SubjectPerformanceSnapshot from './components/subject-performance-snapshot';
-import { BookCopy, GraduationCap, ShieldAlert, ShieldCheck, Shield, TrendingUp, Users } from 'lucide-react';
+import { BookCopy, GraduationCap, ShieldAlert, ShieldCheck, Shield, TrendingUp, Users, MessageSquare } from 'lucide-react';
+import { useCorrectionRequests } from '@/context/correction-request-provider';
 
 export default function AdminDashboard() {
   const { students } = useStudentData();
+  const { requests } = useCorrectionRequests();
+
+  const pendingCorrectionCount = useMemo(() => {
+    return requests.filter(r => r.status === 'pending').length;
+  }, [requests]);
 
   const dashboardStats = useMemo(() => {
     const totalStudents = students.length;
@@ -63,44 +69,54 @@ export default function AdminDashboard() {
       </div>
 
       {/* Executive KPI Row */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 mb-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-8">
         <StatCard
           title="Total Students"
           value={dashboardStats.totalStudents.toString()}
-          icon={<Users />}
+          icon={<Users className="text-blue-500" />}
           trendValue="+2 this week"
         />
         <StatCard
-          title="High-Risk Students"
-          value={dashboardStats.highRiskCount.toString()}
-          icon={<ShieldAlert />}
-          description={`${dashboardStats.highRiskPercent.toFixed(1)}% of students`}
-          trendValue="-1 from yesterday"
-          trendDirection="down"
+          title="Avg. GPA"
+          value={dashboardStats.averageGpa.toFixed(2)}
+          icon={<GraduationCap className="text-primary" />}
+          progress={(dashboardStats.averageGpa / 10) * 100}
         />
         <StatCard
-          title="Medium Risk Students"
-          value={dashboardStats.mediumRiskCount.toString()}
-          icon={<Shield />}
-          description={`${dashboardStats.mediumRiskPercent.toFixed(1)}% of students`}
-        />
-        <StatCard
-          title="Low Risk Students"
-          value={dashboardStats.lowRiskCount.toString()}
-          icon={<ShieldCheck />}
-          description={`${dashboardStats.lowRiskPercent.toFixed(1)}% of students`}
-        />
-        <StatCard
-          title="Overall Passing Rate"
+          title="Passing Rate"
           value={`${dashboardStats.passingRate.toFixed(1)}%`}
-          icon={<TrendingUp />}
+          icon={<TrendingUp className="text-green-500" />}
           progress={dashboardStats.passingRate}
         />
         <StatCard
-          title="Average GPA"
-          value={dashboardStats.averageGpa.toFixed(2)}
-          icon={<GraduationCap />}
-          progress={(dashboardStats.averageGpa / 10) * 100}
+          title="Pending Requests"
+          value={pendingCorrectionCount.toString()}
+          icon={<MessageSquare className={pendingCorrectionCount > 0 ? "text-amber-500" : ""} />}
+          description="Academic data corrections"
+          trendValue={pendingCorrectionCount > 0 ? "Requires Action" : "All clear"}
+          trendDirection={pendingCorrectionCount > 0 ? "up" : undefined}
+          className={pendingCorrectionCount > 0 ? "ring-2 ring-amber-500/20 bg-amber-500/5 transition-all animate-in fade-in duration-1000" : ""}
+        />
+        <StatCard
+          title="High-Risk"
+          value={dashboardStats.highRiskCount.toString()}
+          icon={<ShieldAlert className="text-destructive" />}
+          description={`${dashboardStats.highRiskPercent.toFixed(1)}% of students`}
+          trendValue="-1 from yesterday"
+          trendDirection="down"
+          className="lg:border-l-4 lg:border-l-destructive/50"
+        />
+        <StatCard
+          title="Med-Risk"
+          value={dashboardStats.mediumRiskCount.toString()}
+          icon={<Shield className="text-amber-400" />}
+          description={`${dashboardStats.mediumRiskPercent.toFixed(1)}% of students`}
+        />
+        <StatCard
+          title="Low-Risk"
+          value={dashboardStats.lowRiskCount.toString()}
+          icon={<ShieldCheck className="text-green-500" />}
+          description={`${dashboardStats.lowRiskPercent.toFixed(1)}% of students`}
         />
       </div>
 

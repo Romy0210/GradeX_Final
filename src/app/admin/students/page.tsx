@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { FileUp, ChevronDown, Search } from 'lucide-react';
+import { FileUp, ChevronDown, Search, Trash2, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { StudentTable } from '../dashboard/components/student-table';
@@ -58,7 +58,7 @@ const groupStudents = (students: Student[]) => {
 };
 
 export default function StudentsPage() {
-  const { students, addStudent, updateStudent, deleteStudent, analyzingStudentId, setAnalyzingStudentId } =
+  const { students, addStudent, updateStudent, deleteStudent, deleteStudentsBulk, analyzingStudentId, setAnalyzingStudentId } =
     useStudentData();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const studentToDelete = deleteTarget ? students.find(s => s.id === deleteTarget) : null;
@@ -75,6 +75,14 @@ export default function StudentsPage() {
     semester: 'all',
     riskLevel: 'all',
   });
+
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<{
+    type: 'Batch' | 'Class' | 'Semester';
+    value: string;
+    filters: { batch?: string; class?: string; semester?: string };
+  } | null>(null);
+  const [confirmText, setConfirmText] = useState('');
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   const uniqueBatches = useMemo(
     () => ['all', ...Array.from(new Set(students.map((s) => s.batch)))],
@@ -182,20 +190,12 @@ export default function StudentsPage() {
   };
 
   const handleStudentUpdate = (studentFromForm: Student) => {
-    // The student object from the form already contains calculated aggregates.
     logActivity("STUDENT_UPDATE", `Updated details for student '${studentFromForm.name}'.`);
     updateStudent(studentFromForm);
     runAnalysisForStudent(studentFromForm);
   };
 
-  /**
-   * This function orchestrates the creation of a new student. In a real-world application,
-   * this flow would also include a call to a backend service to create a corresponding
-   * Firebase Authentication user with the student's email and a default password.
-   * @param {StudentFormValues} data - The validated data from the "Add Student" form.
-   */
   const handleAddStudent = async (data: StudentFormValues) => {
-    // Step 1: Prevent duplicates by checking if the roll number already exists.
     if (students.some((student) => student.id === data.rollNumber)) {
       toast({
         variant: 'destructive',
@@ -206,8 +206,6 @@ export default function StudentsPage() {
     }
 
     const { rollNumber, ...studentData } = data;
-
-    // Step 2: Calculate derived academic and assignment metrics.
     const standardSubjects = getSubjectsForGroup(studentData.batch, studentData.class, studentData.semester);
 
     const subjectsWithTotals = (studentData.subjects || []).map(formSubject => {
@@ -239,7 +237,6 @@ export default function StudentsPage() {
       ? subjectAttendances.reduce((acc, a) => acc + a, 0) / subjectAttendances.length
       : 100;
 
-    // Step 3: Construct the new student object with initial placeholder data.
     const newStudent: Student = {
       name: studentData.name,
       email: studentData.email,
@@ -253,14 +250,13 @@ export default function StudentsPage() {
       phone: studentData.phone ?? "",
       id: rollNumber,
       subjects: subjectsWithTotals,
-      profilePhoto: `student-${(students.length % 5) + 1}`, // Assign a placeholder photo
+      profilePhoto: `student-${(students.length % 5) + 1}`,
       bloodGroup: 'N/A',
       overallAverageMarkPercentage: Math.round(overallAverageMarkPercentage),
       attendancePercentage: Math.round(averageAttendance),
       assignmentCompletion: totalCompletedAssignments,
       pendingAssignments: totalPossibleAssignments - totalCompletedAssignments,
       assignmentCompletionPercentage: Math.round(assignmentCompletionPercentage),
-      // Set initial "unset" AI prediction values.
       riskLevel: 'Medium',
       outcome: 'Pass',
       gradeCategory: 'C',
@@ -273,13 +269,9 @@ export default function StudentsPage() {
     };
 
     try {
-      // Step 4: Persist the new student to the "database" (StudentDataProvider) and create Auth account.
       const savedStudent = await addStudent(newStudent);
       if (!savedStudent) throw new Error("Document ID not returned from Auth provider.");
       logActivity("STUDENT_ADD", `New student '${data.name}' was added to '${data.class} - Sem ${data.semester}'.`);
-
-      // Step 5: Trigger the initial AI analysis for the newly created student.
-      // Use the fully saved student object that includes the authUid so we don't overwrite it later.
       runAnalysisForStudent(savedStudent);
       toast({
         title: 'Student Added',
@@ -317,6 +309,30 @@ export default function StudentsPage() {
         description: `${studentToDelete.name} has been removed from the system.`,
       });
       setDeleteTarget(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteTarget || confirmText !== `DELETE ${bulkDeleteTarget.value.toUpperCase()}`) return;
+    
+    setIsDeletingBulk(true);
+    try {
+      await deleteStudentsBulk(bulkDeleteTarget.filters);
+      logActivity("STUDENT_DELETE", `Bulk deleted all students in ${bulkDeleteTarget.type}: ${bulkDeleteTarget.value}.`);
+      toast({
+        title: 'Bulk Deletion Complete',
+        description: `All student records for ${bulkDeleteTarget.type} ${bulkDeleteTarget.value} have been removed.`,
+      });
+      setBulkDeleteTarget(null);
+      setConfirmText('');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Bulk Deletion Failed',
+        description: error.message || 'An unexpected error occurred.',
+      });
+    } finally {
+      setIsDeletingBulk(false);
     }
   };
 
@@ -402,24 +418,66 @@ export default function StudentsPage() {
           {Object.keys(groupedStudents).length > 0 ? (
             Object.entries(groupedStudents).map(([batch, classes]) => (
               <Collapsible key={batch} defaultOpen className="group/batch border rounded-lg p-2">
-                <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-4 py-2 text-lg font-semibold hover:bg-muted">
-                  <span>Batch: {batch}</span>
-                  <ChevronDown className="h-5 w-5 transition-transform data-[state=open]:rotate-180" />
-                </CollapsibleTrigger>
+                <div className="flex w-full items-center justify-between rounded-md px-4 py-2 hover:bg-muted/50">
+                  <CollapsibleTrigger className="flex items-center gap-2 text-lg font-semibold flex-1 text-left">
+                    <span>Batch: {batch}</span>
+                    <ChevronDown className="h-5 w-5 transition-transform data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBulkDeleteTarget({ type: 'Batch', value: batch, filters: { batch } });
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Batch
+                  </Button>
+                </div>
                 <CollapsibleContent className="space-y-2 py-2 pl-4">
                   {Object.entries(classes).map(([className, semesters]) => (
                     <Collapsible key={className} defaultOpen className="group/class border-l pl-2">
-                      <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-4 py-2 text-md font-medium hover:bg-muted/80">
-                        <span>Class: {className}</span>
-                        <ChevronDown className="h-5 w-5 transition-transform data-[state=open]:rotate-180" />
-                      </CollapsibleTrigger>
+                      <div className="flex w-full items-center justify-between rounded-md px-4 py-2 hover:bg-muted/30">
+                        <CollapsibleTrigger className="flex items-center gap-2 text-md font-medium flex-1 text-left">
+                          <span>Class: {className}</span>
+                          <ChevronDown className="h-5 w-5 transition-transform data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBulkDeleteTarget({ type: 'Class', value: className, filters: { batch, class: className } });
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3 mr-2" />
+                          Delete Class
+                        </Button>
+                      </div>
                       <CollapsibleContent className="space-y-2 py-2 pl-4">
                         {Object.entries(semesters).map(([semester, studentsInGroup]) => (
                           <Collapsible key={semester} defaultOpen className="group/semester">
-                            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-4 py-1 text-sm font-semibold hover:bg-muted/50">
-                              <span>Semester: {semester}</span>
-                              <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
-                            </CollapsibleTrigger>
+                            <div className="flex w-full items-center justify-between rounded-md px-4 py-1 hover:bg-muted/20">
+                              <CollapsibleTrigger className="flex items-center gap-2 text-sm font-semibold flex-1 text-left">
+                                <span>Semester: {semester}</span>
+                                <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                              </CollapsibleTrigger>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setBulkDeleteTarget({ type: 'Semester', value: semester, filters: { batch, class: className, semester } });
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Delete Sem
+                              </Button>
+                            </div>
                             <CollapsibleContent className="pt-2">
                               <StudentTable
                                 data={studentsInGroup}
@@ -459,16 +517,54 @@ export default function StudentsPage() {
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={(e) => {
-                e.preventDefault(); // Prevent default auto-close
-                // Close the dialog FIRST so its overlay fully unmounts
+                e.preventDefault();
                 setDeleteTarget(null);
-                // Then trigger deletion after the overlay is removed from the DOM
                 setTimeout(() => {
                   confirmDelete();
                 }, 200);
               }}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteTarget !== null} onOpenChange={(open) => { if (!open) { setBulkDeleteTarget(null); setConfirmText(''); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Critical: Bulk Deletion</AlertDialogTitle>
+          <AlertDialogDescription className="space-y-4 text-left" asChild>
+            <div className="pt-2">
+              <p>
+                You are about to delete <strong>ALL</strong> students in <strong>{bulkDeleteTarget?.type}: {bulkDeleteTarget?.value}</strong>.
+                This action is irreversible and will remove all academic records for these students.
+              </p>
+              <div className="space-y-2 mt-4">
+                <Label htmlFor="confirm-delete">To confirm, type <strong>DELETE {bulkDeleteTarget?.value.toUpperCase()}</strong> below:</Label>
+                <Input
+                  id="confirm-delete"
+                  placeholder={`DELETE ${bulkDeleteTarget?.value.toUpperCase()}`}
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  className="border-destructive"
+                />
+              </div>
+            </div>
+          </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingBulk}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={confirmText !== `DELETE ${bulkDeleteTarget?.value.toUpperCase()}` || isDeletingBulk}
+              onClick={(e) => {
+                e.preventDefault();
+                handleBulkDelete();
+              }}
+            >
+              {isDeletingBulk ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Permanently Delete All
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

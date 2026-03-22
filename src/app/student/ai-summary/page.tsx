@@ -4,7 +4,11 @@ import { useStudentData } from "@/context/student-data-provider";
 import { useUser } from "@/firebase/auth/use-user";
 import { StudyPlanPanel } from "./components/study-plan-panel";
 import { Recommendations } from "../dashboard/components/recommendations";
-import { Loader2, AlertTriangle, Clock, Users } from "lucide-react";
+import { Loader2, AlertTriangle, Clock, Users, CheckCircle, XCircle, Bell, Info } from "lucide-react";
+import { useCorrectionRequests } from "@/context/correction-request-provider";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
 import type { Student } from "@/lib/data";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -29,6 +33,7 @@ const alertIcons = {
 export default function AISummaryPage() {
   const { user, isLoading: isUserLoading } = useUser();
   const { students } = useStudentData();
+  const { requests } = useCorrectionRequests();
   const [student, setStudent] = useState<Student | null | undefined>(undefined);
 
   useEffect(() => {
@@ -98,20 +103,67 @@ export default function AISummaryPage() {
     );
   }
 
+  const studentResolvedRequests = requests.filter(r => r.status !== 'pending' && r.studentUid === user?.uid);
+  const hasUpdates = adminAlerts.length > 0 || studentResolvedRequests.length > 0;
+
   return (
     <>
-      <div className="flex flex-col gap-4">
-        {adminAlerts.map((alert, index) => (
-          <Alert key={index} variant={alert.severity === 'Warning' ? 'destructive' : 'default'}>
-            {alertIcons[alert.type]}
-            <AlertTitle>{alert.title}</AlertTitle>
-            <AlertDescription>
-              {alert.message}
-              <span className="block text-xs text-muted-foreground mt-2">{alert.timestamp}</span>
-            </AlertDescription>
-          </Alert>
-        ))}
-      </div>
+      {hasUpdates && (
+        <Card className="mb-6 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background shadow-sm overflow-hidden border-l-4 border-l-primary">
+          <CardHeader className="py-3 px-4 flex flex-row items-center justify-between border-b border-border/40">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
+              <Bell className="h-4 w-4" />
+              Academic Notifications & Updates
+            </CardTitle>
+            <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-tight">
+              {adminAlerts.length + studentResolvedRequests.length} New
+            </Badge>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[250px]">
+              <div className="divide-y divide-border/40">
+                {adminAlerts.map((alert, index) => (
+                  <div key={`alert-${index}`} className={`flex gap-3 p-4 hover:bg-muted/30 transition-colors ${alert.severity === 'Warning' ? 'bg-destructive/5' : ''}`}>
+                    <div className={`mt-1 h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${alert.severity === 'Warning' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
+                      {alertIcons[alert.type]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className={`text-sm font-bold ${alert.severity === 'Warning' ? 'text-destructive' : 'text-foreground'}`}>{alert.title}</p>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">{alert.timestamp}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed italic">"{alert.message}"</p>
+                    </div>
+                  </div>
+                ))}
+                
+                {studentResolvedRequests.map((req) => (
+                  <div key={req.id} className="flex gap-3 p-4 hover:bg-muted/30 transition-colors bg-green-500/5">
+                    <div className={`mt-1 h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${req.status === 'resolved' ? 'bg-green-100 dark:bg-green-900/30 text-green-600' : 'bg-muted text-muted-foreground'}`}>
+                      {req.status === 'resolved' ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-bold text-foreground">Correction {req.status === 'resolved' ? 'Resolved' : 'Dismissed'}: {req.field}</p>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">{req.updatedAt ? new Date(req.updatedAt.toDate()).toLocaleDateString() : 'Recently'}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground italic leading-relaxed">Admin Feedback: "{req.adminComment || "No comment provided."}"</p>
+                        {req.status === 'resolved' && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-green-600 font-semibold uppercase tracking-wider mt-1">
+                            <Info className="h-3 w-3" />
+                            System Updated
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">

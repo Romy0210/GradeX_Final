@@ -32,6 +32,7 @@ interface StudentDataContextType {
   addStudents: (newStudents: Student[]) => Promise<void>;
   updateStudent: (updatedStudent: Student) => void;
   deleteStudent: (studentId: string) => void;
+  deleteStudentsBulk: (filters: { batch?: string; class?: string; semester?: string }) => Promise<void>;
   findStudentById: (id: string) => Student | undefined;
   studentCount: number;
   clearStudentData: () => void;
@@ -251,6 +252,39 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     }
   }, [firestore, students]);
 
+  /**
+   * Deletes multiple students from Firestore based on filters.
+   */
+  const deleteStudentsBulk = useCallback(async (filters: { batch?: string; class?: string; semester?: string }) => {
+    if (!firestore) return;
+    try {
+      const { batch: batchFilter, class: classFilter, semester: semesterFilter } = filters;
+      
+      // 1. Query students matching the filters
+      let q = query(collection(firestore, "students"));
+      if (batchFilter) q = query(q, where("batch", "==", batchFilter));
+      if (classFilter) q = query(q, where("class", "==", classFilter));
+      if (semesterFilter) q = query(q, where("semester", "==", semesterFilter));
+
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return;
+
+      // 2. Perform batch deletion in segments (Firestore limit is 500)
+      const docs = snapshot.docs;
+      for (let i = 0; i < docs.length; i += 500) {
+        const batch = writeBatch(firestore);
+        const chunk = docs.slice(i, i + 500);
+        chunk.forEach(docSnap => batch.delete(docSnap.ref));
+        await batch.commit();
+      }
+
+      // Note: Bulk Auth deletion is skipped for performance/complexity in client-side.
+    } catch (error) {
+      console.error("Error deleting students in bulk:", error);
+      throw error;
+    }
+  }, [firestore]);
+
   const findStudentById = useCallback(
     (id: string): Student | undefined => {
       return students.find((student) => student.id === id);
@@ -282,6 +316,7 @@ export function StudentDataProvider({ children }: { children: ReactNode }) {
     addStudents,
     updateStudent,
     deleteStudent,
+    deleteStudentsBulk,
     findStudentById,
     studentCount: students.length,
     clearStudentData,
