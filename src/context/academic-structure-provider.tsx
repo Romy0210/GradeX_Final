@@ -17,6 +17,8 @@ import {
   where,
   doc,
   updateDoc,
+  deleteDoc,
+  writeBatch,
   serverTimestamp
 } from "firebase/firestore";
 import { setDoc } from "firebase/firestore";
@@ -29,6 +31,7 @@ interface AcademicStructureContextType {
   getSubjectsForGroup: (batch: string, className: string, semester: string) => Subject[];
   addOrUpdateConfiguration: (config: SubjectConfiguration) => Promise<void>;
   createAcademicGroup: (group: { batch: string; class: string; semester: string }) => Promise<boolean>;
+  deleteAcademicGroupsBulk: (filters: { batch?: string; class?: string; semester?: string }) => Promise<void>;
 }
 
 const AcademicStructureContext = createContext<AcademicStructureContextType | undefined>(undefined);
@@ -172,11 +175,51 @@ export function AcademicStructureProvider({ children }: { children: ReactNode })
     [firestore]
   );
 
+  /* ==============================
+     DELETE ACADEMIC GROUPS BULK
+  ============================== */
+
+  const deleteAcademicGroupsBulk = useCallback(
+    async (filters: { batch?: string; class?: string; semester?: string }): Promise<void> => {
+      if (!firestore) return;
+
+      const { batch: batchFilter, class: classFilter, semester: semesterFilter } = filters;
+      
+      // 1. Find configurations matching filters
+      const toDelete = configurations.filter(c => {
+        const batchMatch = !batchFilter || c.batch === batchFilter;
+        const classMatch = !classFilter || c.class === classFilter;
+        const semesterMatch = !semesterFilter || c.semester === semesterFilter;
+        return batchMatch && classMatch && semesterMatch;
+      });
+
+      if (toDelete.length === 0) return;
+
+      try {
+        // 2. Perform bulk deletion in Segments
+        const batch = writeBatch(firestore);
+        toDelete.forEach(config => {
+          batch.delete(doc(firestore, "academicGroups", config.id));
+        });
+        await batch.commit();
+        
+        // 3. Update local state
+        const deleteIds = new Set(toDelete.map(c => c.id));
+        setConfigurations((prev) => prev.filter(c => !deleteIds.has(c.id)));
+      } catch (error) {
+        console.error("Error bulk deleting academic groups:", error);
+        throw error;
+      }
+    },
+    [firestore, configurations]
+  );
+
   const value = {
     configurations,
     getSubjectsForGroup,
     addOrUpdateConfiguration,
     createAcademicGroup,
+    deleteAcademicGroupsBulk,
   };
 
   return (

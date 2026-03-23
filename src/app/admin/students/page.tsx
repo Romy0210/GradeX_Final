@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FileUp, ChevronDown, Search, Trash2, Loader2 } from 'lucide-react';
 
@@ -64,7 +65,8 @@ export default function StudentsPage() {
   const studentToDelete = deleteTarget ? students.find(s => s.id === deleteTarget) : null;
   const { modelParameters } = useSettings();
   const { toast } = useToast();
-  const { getSubjectsForGroup } = useAcademicStructure();
+  const { getSubjectsForGroup, deleteAcademicGroupsBulk } = useAcademicStructure();
+  const router = useRouter();
   const { logActivity } = useActivityLog();
 
 
@@ -318,11 +320,16 @@ export default function StudentsPage() {
     setIsDeletingBulk(true);
     try {
       await deleteStudentsBulk(bulkDeleteTarget.filters);
-      logActivity("STUDENT_DELETE", `Bulk deleted all students in ${bulkDeleteTarget.type}: ${bulkDeleteTarget.value}.`);
+      await deleteAcademicGroupsBulk(bulkDeleteTarget.filters);
+      
+      logActivity("STUDENT_DELETE", `Bulk deleted all students and configuration in ${bulkDeleteTarget.type}: ${bulkDeleteTarget.value}.`);
+      
       toast({
         title: 'Bulk Deletion Complete',
-        description: `All student records for ${bulkDeleteTarget.type} ${bulkDeleteTarget.value} have been removed.`,
+        description: `All student records and group configurations for ${bulkDeleteTarget.type} ${bulkDeleteTarget.value} have been removed.`,
       });
+
+      router.refresh();
       setBulkDeleteTarget(null);
       setConfirmText('');
     } catch (error: any) {
