@@ -24,9 +24,10 @@ with open("feature_names.json") as f:
 df = pd.read_csv("data/student_data.csv")
 df['assignment_ratio'] = df['assignmentCompletionPercentage'] / 100.0
 df['composite_score']  = (
-    (df['avgInternalMarkPercentage']      * 0.6) +
-    (df['assignmentCompletionPercentage'] * 0.2) +
-    (df['attendancePercentage']           * 0.2)
+    (df['avgInternalMarkPercentage']      * 0.70) +
+    (df['assignmentCompletionPercentage'] * 0.12) +
+    (df['gpa'] * 10                       * 0.10) +
+    (df['attendancePercentage']           * 0.08)
 )
 df['has_failing_subject'] = (df['failingSubjectCount'] > 0).astype(int)
 

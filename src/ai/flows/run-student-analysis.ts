@@ -119,18 +119,25 @@ export async function runStudentAnalysis(
     // Fallback if ML service is down or errors. 
     // This allows the app to continue functioning gracefully by falling back to deterministic rules if the server isn't running.
     
-    // Calculate a deterministic fallback probability based on composite score signals
-    const compositeScore = (input.overallAverageMarkPercentage * 0.6) + (input.attendancePercentage * 0.2) + (input.assignmentCompletionPercentage * 0.2);
+    // Calculate a deterministic fallback probability based on synchronized 70/12/10/8 weights
+    const compositeScore = 
+      (input.overallAverageMarkPercentage * 0.70) + 
+      (input.assignmentCompletionPercentage * 0.12) + 
+      (input.gpa * 10 * 0.10) + 
+      (input.attendancePercentage * 0.08);
     
     let fallbackRisk: 'Low' | 'Medium' | 'High' = 'Medium';
     let fallbackOutcome: 'Pass' | 'Fail' = 'Pass';
     let fallbackGrade: 'S' | 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C' | 'D' | 'F' = 'C';
     
     if (compositeScore >= 90) { fallbackRisk = 'Low'; fallbackGrade = 'S'; }
+    else if (compositeScore >= 85) { fallbackRisk = 'Low'; fallbackGrade = 'A+'; }
     else if (compositeScore >= 80) { fallbackRisk = 'Low'; fallbackGrade = 'A'; }
+    else if (compositeScore >= 75) { fallbackRisk = 'Medium'; fallbackGrade = 'B+'; }
     else if (compositeScore >= 70) { fallbackRisk = 'Medium'; fallbackGrade = 'B'; }
+    else if (compositeScore >= 65) { fallbackRisk = 'Medium'; fallbackGrade = 'C+'; }
     else if (compositeScore >= 60) { fallbackRisk = 'Medium'; fallbackGrade = 'C'; }
-    else if (compositeScore >= 45) { fallbackRisk = 'High'; fallbackGrade = 'D'; }
+    else if (compositeScore >= 55) { fallbackRisk = 'Medium'; fallbackGrade = 'D'; }
     else { fallbackRisk = 'High'; fallbackOutcome = 'Fail'; fallbackGrade = 'F'; }
 
     // Confidence Calculation for Fallback:
@@ -171,11 +178,16 @@ export async function runStudentAnalysis(
         assignmentScore = (s.completedAssignments / s.totalAssignments) * 100;
       }
 
-      // Composite Score
-      const compositeScore = (avgMarkPercentage * 0.6) + (assignmentScore * 0.2) + (attendanceScore * 0.2);
+      // Standardized Composite Score (70/12/10/8)
+      // For subject-wise logic, we use the student's overall GPA for the 10% weight
+      const compositeScore = 
+        (avgMarkPercentage * 0.70) + 
+        (assignmentScore * 0.12) + 
+        (input.gpa * 10 * 0.10) + 
+        (attendanceScore * 0.08);
 
       // Determine Base Subject Grade
-      let baseGrade = 'F';
+      let baseGrade: 'S' | 'A+' | 'A' | 'B+' | 'B' | 'C+' | 'C' | 'D' | 'F' = 'F';
       if (compositeScore >= 90) baseGrade = 'S';
       else if (compositeScore >= 85) baseGrade = 'A+';
       else if (compositeScore >= 80) baseGrade = 'A';

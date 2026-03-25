@@ -21,12 +21,13 @@ def feature_engineering(df):
     # Assignment Completion Ratio
     df_engineered['assignment_ratio'] = df_engineered['assignmentCompletionPercentage'] / 100.0
     
-    # Composite Score: Marks (60%) + Assignment (20%) + Attendance (20%)
-    # Use avgInternalMarkPercentage (real subject marks) instead of overallAverageMarkPercentage
+    # Composite Score: Marks (70%) + Assignment (12%) + GPA (10%) + Attendance (8%)
+    # Use avgInternalMarkPercentage (real subject marks)
     df_engineered['composite_score'] = (
-        (df_engineered['avgInternalMarkPercentage'] * 0.6) + 
-        (df_engineered['assignmentCompletionPercentage'] * 0.2) + 
-        (df_engineered['attendancePercentage'] * 0.2)
+        (df_engineered['avgInternalMarkPercentage'] * 0.70) + 
+        (df_engineered['assignmentCompletionPercentage'] * 0.12) + 
+        (df_engineered['gpa'] * 10 * 0.10) + 
+        (df_engineered['attendancePercentage'] * 0.08)
     )
 
     # Boolean: does the student have any failing subject?

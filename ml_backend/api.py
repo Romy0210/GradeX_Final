@@ -108,10 +108,12 @@ async def predict_risk(student: StudentFeatures):
 
         # Engineering features (same as training)
         assignment_ratio = student.assignmentCompletionPercentage / 100.0
+        # Composite Score: Marks (70%) + Assignment (12%) + GPA (10%) + Attendance (8%)
         composite_score = (
-            (avg_internal * 0.6) + 
-            (student.assignmentCompletionPercentage * 0.2) + 
-            (student.attendancePercentage * 0.2)
+            (avg_internal * 0.70) + 
+            (student.assignmentCompletionPercentage * 0.12) + 
+            (student.gpa * 10 * 0.10) + 
+            (student.attendancePercentage * 0.08)
         )
         has_failing_subject = 1 if failing_count > 0 else 0
         
@@ -134,8 +136,12 @@ async def predict_risk(student: StudentFeatures):
         df_input = df_input[feature_names]  # Reorder to match training
         
         # Predict class and probability
+        import time
+        start_time = time.time()
         prediction = model.predict(df_input)
         probabilities = model.predict_proba(df_input)[0]
+        pred_time = time.time() - start_time
+        print(f"⏱️ Model Prediction: {pred_time:.4f}s")
         
         predicted_class_idx = prediction[0]
         risk_level = encoder.inverse_transform([predicted_class_idx])[0]
@@ -155,7 +161,11 @@ async def predict_risk(student: StudentFeatures):
         top_factors = []
         try:
             if explainer:
-                shap_values = explainer.shap_values(df_input)
+                shap_start = time.time()
+                # Fast path for tree models
+                shap_values = explainer.shap_values(df_input, check_additivity=False)
+                shap_time = time.time() - shap_start
+                print(f"⏱️ SHAP Explanation: {shap_time:.4f}s")
                 class_shap_values = shap_values[predicted_class_idx][0]
                 
                 feature_impacts = list(zip(feature_names, class_shap_values))
