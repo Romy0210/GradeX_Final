@@ -51,5 +51,13 @@ service cloud.firestore {
       // Only admins can create and manage notifications
       allow write: if isAdmin();
     }
+
+    // Rules for academic groups (batches, classes, semesters)
+    match /academicGroups/{groupId} {
+      // All authenticated users can read academic structure
+      allow read: if request.auth != null;
+      // Only admins can modify the academic structure
+      allow write: if isAdmin();
+    }
   }
 }

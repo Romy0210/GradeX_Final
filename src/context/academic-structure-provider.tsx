@@ -24,6 +24,7 @@ import {
 import { setDoc } from "firebase/firestore";
 
 import { useFirestore } from "@/firebase";
+import { useUser } from "@/firebase/auth/use-user";
 import { type SubjectConfiguration, type Subject } from "@/lib/academic-structure";
 
 interface AcademicStructureContextType {
@@ -44,8 +45,10 @@ export function AcademicStructureProvider({ children }: { children: ReactNode })
      LOAD ALL CONFIGURATIONS
   ============================== */
 
+  const { user } = useUser();
+
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
 
     const fetchConfigurations = async () => {
       try {

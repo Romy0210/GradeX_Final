@@ -9,6 +9,7 @@ import {
   ReactNode
 } from "react";
 import { useFirestore } from "@/firebase";
+import { useUser } from "@/firebase/auth/use-user";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
 export interface ModelParameters {
@@ -32,6 +33,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
   const [modelParameters, setModelParametersState] = useState<ModelParameters>(defaultModelParameters);
 
+  const { userProfile, isLoading: isUserLoading } = useUser();
+
   // Real-time listener for settings in Firestore
   useEffect(() => {
     if (!firestore) return;
@@ -46,10 +49,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             setModelParametersState(data as ModelParameters);
           }
         } else {
-          // If document doesn't exist, create it with defaults
-          setDoc(docRef, defaultModelParameters).catch((error) => {
-            console.error("Error writing default settings to Firestore:", error);
-          });
+          // If document doesn't exist, create it with defaults (Only for Admins)
+          if (!isUserLoading && userProfile?.role === 'admin') {
+            setDoc(docRef, defaultModelParameters).catch((error) => {
+              console.error("Error writing default settings to Firestore:", error);
+            });
+          }
         }
       },
       (error) => {

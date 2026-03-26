@@ -43,11 +43,11 @@ const ActivityLogContext = createContext<ActivityLogContextType | undefined>(und
 export function ActivityLogProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
   const [activities, setActivities] = useState<Activity[]>([]);
-  const { user } = useUser();
-
+  const { user, userProfile, isLoading: isUserLoading } = useUser();
+  
   // Real-time listener for activity logs, ordered by createdAt descending, limited to 50
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore || isUserLoading || !user || userProfile?.role !== 'admin') return;
 
     const q = query(
       collection(firestore, "activityLogs"),
