@@ -83,7 +83,7 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
     );
 
     return () => unsubscribe();
-  }, [firestore]);
+  }, [firestore, user, userProfile, isUserLoading]);
 
   const logActivity = useCallback(async (eventType: ActivityEventType, description: string) => {
     if (!firestore) return;

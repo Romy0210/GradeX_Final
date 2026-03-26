@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,6 +28,7 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+
 
 export default function LoginPage() {
   const router = useRouter();
@@ -224,8 +226,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-6 bg-background">
-      <div className="w-full max-w-md mx-auto rounded-xl border bg-card text-card-foreground p-8 shadow-lg">
+    <div className="relative flex items-center justify-center min-h-screen p-6 overflow-hidden">
+      {/* Dynamic University Background */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/university_campus_bg.png"
+          alt="University Campus"
+          fill
+          className="object-cover"
+          style={{ filter: 'blur(8px)', transform: 'scale(1.1)' }}
+          priority
+        />
+        <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px]" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md mx-auto rounded-xl border bg-card/95 text-card-foreground p-8 shadow-2xl backdrop-blur-sm">
         <div className="flex flex-col items-center text-center gap-2 mb-8">
           <div className="flex items-center gap-3">
             <GradeXLogo className="h-10 w-10 text-primary" />
@@ -257,6 +272,7 @@ export default function LoginPage() {
               placeholder="email@example.com"
               {...register('email')}
               autoComplete="email"
+              className="bg-background/50"
             />
             {errors.email && (
               <p className="text-sm text-destructive">{errors.email.message}</p>
@@ -269,6 +285,7 @@ export default function LoginPage() {
               type="password"
               {...register('password')}
               autoComplete="current-password"
+              className="bg-background/50"
             />
             {errors.password && (
               <p className="text-sm text-destructive">
@@ -276,7 +293,7 @@ export default function LoginPage() {
               </p>
             )}
           </div>
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full shadow-md hover:shadow-lg transition-all" disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Login
           </Button>
@@ -284,7 +301,7 @@ export default function LoginPage() {
 
         <div className="mt-4 text-center text-sm">
           Don&apos;t have an account?{' '}
-          <Link href="/register" className="underline">
+          <Link href="/register" className="underline font-medium hover:text-primary transition-colors">
             Sign up
           </Link>
         </div>
@@ -302,7 +319,7 @@ export default function LoginPage() {
 
         <Button
           variant="outline"
-          className="w-full mt-4"
+          className="w-full mt-4 bg-background/50 hover:bg-background transition-all shadow-sm"
           onClick={handleGoogleSignIn}
           disabled={isGoogleLoading}
         >
