@@ -66,7 +66,7 @@ export function AcademicStructureProvider({ children }: { children: ReactNode })
     };
 
     fetchConfigurations();
-  }, [firestore]);
+  }, [firestore, user]);
 
   /* ==============================
      GET SUBJECTS

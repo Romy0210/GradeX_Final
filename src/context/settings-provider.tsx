@@ -63,7 +63,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     );
 
     return () => unsubscribe();
-  }, [firestore]);
+  }, [firestore, userProfile, isUserLoading]);
 
   const setModelParameters = useCallback(async (params: ModelParameters) => {
     setModelParametersState(params);

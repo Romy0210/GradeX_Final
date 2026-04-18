@@ -173,8 +173,8 @@ GradeX_Final/
 ### 1️⃣ Clone Repository  
 
 ```bash
-git clone https://github.com/your-username/gradex.git
-cd gradex
+git clone https://github.com/Romy0210/GradeX_Final.git
+cd GradeX_Final
 ```
 
 ###  2️⃣ Install Frontend Dependencies

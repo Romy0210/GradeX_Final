@@ -49,22 +49,34 @@ const RecommendationCategory = ({
   );
 };
 
+const cleanRecommendation = (text: string | undefined) => {
+  if (!text) return text;
+  return text
+    .replace(/\d+\.\s+\*\*The 'Why':\*\*/g, '')
+    .replace(/\d+\.\s+\*\*What to do now:\*\*/g, '')
+    .replace(/\*\*The 'Why':\*\*/g, '')
+    .replace(/\*\*What to do now:\*\*/g, '')
+    .replace(/\d+\.\s+\*\*/g, '') // Matches "1. **"
+    .replace(/\*\*/g, '')
+    .trim();
+};
+
 export function Recommendations({ student }: RecommendationsProps) {
   const overallSections = [
     {
       icon: <BookOpen className="w-5 h-5" />,
       title: "Academic Recommendations",
-      text: student.academicRecommendations,
+      text: cleanRecommendation(student.academicRecommendations),
     },
     {
       icon: <TrendingUp className="w-5 h-5" />,
       title: "Attendance & Behavior Tips",
-      text: student.behavioralRecommendations,
+      text: cleanRecommendation(student.behavioralRecommendations),
     },
     {
       icon: <ShieldAlert className="w-5 h-5" />,
       title: "Risk-Based Intervention Advice",
-      text: student.interventionRecommendations,
+      text: cleanRecommendation(student.interventionRecommendations),
     },
   ];
 

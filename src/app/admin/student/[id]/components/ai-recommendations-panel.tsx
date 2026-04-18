@@ -62,6 +62,18 @@ const RecommendationCategory = ({
 type RecommendationsData = Partial<Student> &
   Partial<PersonalizedRecommendationsOutput>;
 
+const cleanRecommendation = (text: string | undefined) => {
+  if (!text) return text;
+  return text
+    .replace(/\d+\.\s+\*\*The 'Why':\*\*/g, '')
+    .replace(/\d+\.\s+\*\*What to do now:\*\*/g, '')
+    .replace(/\*\*The 'Why':\*\*/g, '')
+    .replace(/\*\*What to do now:\*\*/g, '')
+    .replace(/\d+\.\s+\*\*/g, '') // Matches "1. **"
+    .replace(/\*\*/g, '')
+    .trim();
+};
+
 export function AIRecommendationsPanel({
   recommendationsData,
   isLoading,
@@ -70,9 +82,9 @@ export function AIRecommendationsPanel({
   isLoading: boolean;
 }) {
   const overallRecommendations = {
-    academic: recommendationsData.academicRecommendations,
-    behavioral: recommendationsData.behavioralRecommendations,
-    intervention: recommendationsData.interventionRecommendations,
+    academic: cleanRecommendation(recommendationsData.academicRecommendations),
+    behavioral: cleanRecommendation(recommendationsData.behavioralRecommendations),
+    intervention: cleanRecommendation(recommendationsData.interventionRecommendations),
   };
   
   const subjectRecommendations = recommendationsData.subjectRecommendations;

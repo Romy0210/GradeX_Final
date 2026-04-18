@@ -94,11 +94,10 @@ export async function generatePersonalizedRecommendations(
           content: `Student Metrics:\n${JSON.stringify(promptData, null, 2)}
           
 Strictly follow the JSON structure. 
-For Academic, Behavioral, and Intervention, use this exact format with basic words:
-1. **The 'Why':** Explain why this advice/praise is needed using their numbers (e.g., "Because your attendance is an excellent 100%...").
-2. **What to do now:** Give 2-3 clear, simple steps to fix issues, OR if they are doing great, give steps to maintain their streak or explore advanced topics.
-
-CRITICAL: If the student is performing exceptionally well (e.g. Risk Level is Low, grades are high), NEVER say "No advice needed". Instead, provide high praise, appreciate their hard work, and give motivational tips to keep up the excellent work!
+For Academic, Behavioral, and Intervention, write a clear, supportive 2-3 sentence paragraph. 
+First, explain why this advice or praise is needed using their specific numbers (e.g., "Because your attendance is an excellent 100%..."). 
+Then, provide direct, simple steps to improve OR to keep up the great work. 
+CRITICAL: DO NOT use labels like "The Why", "What to do now", numbering (1., 2.), or markdown bold symbols (**). Use plain, simple text only.
 
 For subjectRecommendations, provide 1 very simple sentence.`
         }
