@@ -132,7 +132,7 @@ export async function runStudentAnalysis(
     
     if (compositeScore >= 90) { fallbackRisk = 'Low'; fallbackGrade = 'S'; }
     else if (compositeScore >= 85) { fallbackRisk = 'Low'; fallbackGrade = 'A+'; }
-    else if (compositeScore >= 80) { fallbackRisk = 'Low'; fallbackGrade = 'A'; }
+    else if (compositeScore >= 80) { fallbackRisk = 'Medium'; fallbackGrade = 'A'; }
     else if (compositeScore >= 75) { fallbackRisk = 'Medium'; fallbackGrade = 'B+'; }
     else if (compositeScore >= 70) { fallbackRisk = 'Medium'; fallbackGrade = 'B'; }
     else if (compositeScore >= 65) { fallbackRisk = 'Medium'; fallbackGrade = 'C+'; }
@@ -206,9 +206,9 @@ export async function runStudentAnalysis(
       let riskLevel: 'Low' | 'Medium' | 'High' = 'Medium';
       let outcome: 'Pass' | 'Fail' = 'Pass';
 
-      if (['S', 'A+', 'A'].includes(baseGrade)) {
+      if (['S', 'A+'].includes(baseGrade)) {
         riskLevel = 'Low';
-      } else if (['B+', 'B', 'C+', 'C', 'D'].includes(baseGrade)) {
+      } else if (['A', 'B+', 'B', 'C+', 'C', 'D'].includes(baseGrade)) {
         riskLevel = 'Medium';
       } else if (baseGrade === 'F') {
         riskLevel = 'High';
